@@ -1,0 +1,24 @@
+{
+  "schemaVersion": "0.1.0",
+  "name": "ChatGPT → Obsidian",
+  "behavior": "create",
+  "noteContentFormat": "markdown",
+  "properties": [
+    {"name": "title", "value": "{{title}}", "type": "text"},
+    {"name": "source", "value": "chatgpt", "type": "text"},
+    {"name": "manual", "value": "true", "type": "checkbox"},
+    {"name": "date", "value": "{{date}}", "type": "date"},
+    {"name": "url", "value": "{{url}}", "type": "text"},
+    {"name": "tags", "value": "ai-chat, manual", "type": "multitext"},
+    {"name": "aliases", "value": "", "type": "multitext"},
+    {"name": "phi-source", "value": "false", "type": "checkbox"}
+  ],
+  "triggers": [
+    "https://chatgpt.com/c/",
+    "https://chat.openai.com/c/"
+  ],
+  "noteNameFormat": "{{date}}_{{title|safe_name|slice:0,60}}",
+  "path": "Chats/ChatGPT/_manual",
+  "vault": "ObsidianVault",
+  "noteContent": "# {{title}}\n\n> [!info] Manually saved from ChatGPT\n> - **Source**: ChatGPT (manual save, not quarterly export)\n> - **Share URL**: {{url}}\n> - **Date**: {{date}}\n> - **Why kept**: ←後で使う見込み・理由を 1 行\n\n{{selectorHtml:[data-message-author-role]|markdown}}\n\n## 自分のメモ\n\n- 重要ポイント:\n- 後で確認:\n- 関連 wiki: [[wiki/topics/]]\n\n## 関連\n\n- [[]]\n"
+}

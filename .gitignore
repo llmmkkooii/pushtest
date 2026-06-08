@@ -1,0 +1,28 @@
+# Secrets — never commit
+.env
+.env.*
+*.key
+*.pem
+credentials.json
+*_secret*
+*_token*
+
+# Scratch / temporary work artifacts (not for publishing)
+temp/
+
+# Claude Code local settings and session logs (machine-local, may contain sensitive content)
+.claude/
+
+# Build artifacts
+*.zip
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# OS / editor
+.DS_Store
+.test.txt.swp
+*.swp
