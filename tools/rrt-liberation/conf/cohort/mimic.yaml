@@ -1,0 +1,4 @@
+name: mimic
+min_off_hours: 24.0
+events_csv: ${paths.data_dir}/mimic/crrt_events.csv
+labs_csv: ${paths.data_dir}/mimic/labs.csv
