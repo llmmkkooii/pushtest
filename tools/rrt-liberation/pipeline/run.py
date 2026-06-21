@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, cast as _cast
 
 import hydra
 import numpy as np
@@ -24,6 +24,7 @@ from rrt_liberation.evaluation.internal_validation import internal_validation
 from rrt_liberation.features import build_features
 from rrt_liberation.liberation import get_horizon
 from rrt_liberation.model import ModelFactory
+from rrt_liberation.model.base import BaseModel
 from rrt_liberation.model.logistic import LogisticModel
 from rrt_liberation.model.persistence import save_model_json
 from rrt_liberation.reporting import build_coefficient_table, build_table1, write_flow
@@ -69,21 +70,33 @@ def run_pipeline(
         if len(np.unique(y)) < 2:
             raise ValueError("logistic model requires two outcome classes to train")
         hp = model_hparams or {}
+        hp_penalty: Optional[str] = _cast(Optional[str], hp.get("penalty"))
+        hp_C: float = float(_cast(float, hp.get("C", 1.0)))
+        hp_max_iter: int = int(_cast(int, hp.get("max_iter", 1000)))
 
         def fit_fn(x_tr: pd.DataFrame, y_tr: np.ndarray) -> LogisticModel:
-            return LogisticModel(predictors=predictors, **hp).fit(x_tr, y_tr)
+            return LogisticModel(
+                predictors=predictors,
+                penalty=hp_penalty,
+                C=hp_C,
+                max_iter=hp_max_iter,
+            ).fit(x_tr, y_tr)
 
         model = fit_fn(feats[predictors], y)
         save_model_json(model, output_dir / "model_logistic.json", created_utc=created_utc)
         iv = internal_validation(fit_fn, feats[predictors], y, n_boot=n_boot, seed=seed)
+        iv_auroc = _cast(Dict[str, float], iv["auroc"])
+        iv_calib = _cast(Dict[str, float], iv["calib_slope"])
+        iv_coefs = _cast(Dict[str, Dict[str, float]], iv["coefficients"])
+        iv_nboot = int(_cast(int, iv["n_boot_used"]))
 
         save_calibration_plot(y, model.predict_proba(feats[predictors]), output_dir / "calibration.png")
         write_json(
-            {"auroc": iv["auroc"], "calib_slope": iv["calib_slope"], "n_boot_used": iv["n_boot_used"]},
+            {"auroc": iv_auroc, "calib_slope": iv_calib, "n_boot_used": iv_nboot},
             output_dir / "model_performance.json",
         )
         write_csv(
-            build_coefficient_table(iv["coefficients"]).reset_index(names="predictor"),
+            build_coefficient_table(iv_coefs).reset_index(names="predictor"),
             output_dir / "coefficients.csv",
         )
         write_csv(build_table1(feats).reset_index(names="variable"), output_dir / "table1.csv")
@@ -92,16 +105,16 @@ def run_pipeline(
             output_dir / "flow.txt",
         )
         metrics = {
-            "auroc": float(iv["auroc"]["apparent"]),
-            "auroc_corrected": float(iv["auroc"]["corrected"]),
-            "calib_slope_corrected": float(iv["calib_slope"]["corrected"]),
-            "n_boot_used": int(iv["n_boot_used"]),
+            "auroc": float(iv_auroc["apparent"]),
+            "auroc_corrected": float(iv_auroc["corrected"]),
+            "calib_slope_corrected": float(iv_calib["corrected"]),
+            "n_boot_used": iv_nboot,
         }
         logger.info("Logistic pipeline metrics: %s", metrics)
         return metrics
 
-    model = ModelFactory(model_name)(coefficients=coefficients)
-    proba = model.predict_proba(feats[predictors])
+    base_model: BaseModel = ModelFactory(model_name)(coefficients=coefficients)
+    proba = base_model.predict_proba(feats[predictors])
 
     if len(np.unique(y)) > 1:
         disc = auroc_with_ci(y, proba, n_boot=200, seed=seed)
