@@ -172,6 +172,21 @@ tools/rrt-liberation/
 
 ---
 
+## 4b. 決定記録: 「離脱試行」の操作的定義（2026-06-21 確定）
+
+proposal §6 で保留だった「離脱試行（liberation attempt）」の操作的定義を、実装時に確定した。
+
+- **定義**: CRRT-off が `min_off_hours`（既定 24h）以上持続したオフ期間を1件の離脱試行とする。
+  これを **区間間ギャップと記録末尾の持続オフ（無限持続とみなす）に一律適用**する。stayの区間数による特例は設けない。
+- **アウトカム（`label_outcome`）**: 試行時刻後 `(attempt_time, attempt_time + horizon]`（右閉区間）に
+  CRRT再開（区間starttime）が無ければ success=1、あれば success=0。境界（再開＝deadline同時刻）は失敗。
+- 実装・テスト: `src/rrt_liberation/liberation/rules.py`、`tests/test_liberation.py`
+  （below-threshold gap＋trailing off / single-interval trailing / above-threshold gap / restart-within-horizon /
+  restart-at-deadline=failure を網羅）。
+- 競合リスク（死亡）・退院時透析非依存などの定義差は proposal §8 の感度分析として次段で扱う。
+
+---
+
 ## 5. 次段（このspecの外、将来イテレーション）
 
 1. 開発モデル（logistic主＋RF/XGBoost参照）の学習実装
