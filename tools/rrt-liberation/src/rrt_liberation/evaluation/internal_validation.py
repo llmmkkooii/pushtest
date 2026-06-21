@@ -85,6 +85,10 @@ def internal_validation(
             logger.warning("Bootstrap iteration skipped: %s", exc)
             continue
 
+    # CIs are reported only for predictors present in the apparent model. A
+    # bootstrap resample with no missing rows for a predictor can yield a model
+    # whose flag-column key set differs; such absent samples degenerate to a
+    # zero-width CI at the point estimate (invariant: 0 drift on real fixtures).
     coef_ci: Dict[str, Dict[str, float]] = {}
     for name, point in model_app.coefficients.items():
         samples = coef_samples.get(name, [])

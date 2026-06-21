@@ -62,6 +62,8 @@ class LogisticModel(BaseModel):
         return self
 
     def predict_proba(self, X: pd.DataFrame) -> np.ndarray:
+        if self.predictors is None or not self._feature_order:
+            raise RuntimeError("LogisticModel must be fit (or loaded) before predict_proba")
         Z = self.preprocessor.transform(X[self.predictors])
         lin = np.full(len(Z), self.intercept, dtype=float)
         for name in self._feature_order:
