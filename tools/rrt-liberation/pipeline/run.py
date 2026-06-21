@@ -38,6 +38,7 @@ def run_pipeline(
     coefficients: Dict[str, float],
     output_dir: str | Path,
     seed: int = 42,
+    cohort_name: str = "mimic",
 ) -> Dict[str, float]:
     """Run the vertical slice and return key metrics."""
     set_seed(seed)
@@ -50,7 +51,7 @@ def run_pipeline(
     labs = read_csv(labs_csv)
 
     horizon = get_horizon(liberation_name)
-    builder = CohortFactory("mimic")(min_off_hours=min_off_hours)
+    builder = CohortFactory(cohort_name)(min_off_hours=min_off_hours)
     cohort = builder.build(events=events, horizon_hours=horizon)
 
     feats = build_features(cohort, labs=labs, predictors=predictors)
@@ -61,7 +62,11 @@ def run_pipeline(
 
     if len(np.unique(y)) > 1:
         disc = auroc_with_ci(y, proba, n_boot=200, seed=seed)
-        calib = calibration_slope_intercept(y, proba)
+        try:
+            calib = calibration_slope_intercept(y, proba)
+        except Exception as exc:  # pragma: no cover - numerical edge cases
+            logger.warning("Calibration failed (%s); reporting NaN", exc)
+            calib = {"slope": float("nan"), "intercept": float("nan")}
     else:
         logger.warning("Outcome has a single class; skipping AUROC/calibration")
         disc = {"auroc": 0.5, "ci_low": 0.5, "ci_high": 0.5}
@@ -96,6 +101,7 @@ def main(cfg: DictConfig) -> None:
         coefficients=OmegaConf.to_container(cfg.model.coefficients),  # type: ignore[arg-type]
         output_dir=cfg.paths.output_dir,
         seed=cfg.seed,
+        cohort_name=cfg.cohort.name,
     )
 
 

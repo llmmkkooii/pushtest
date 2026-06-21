@@ -15,6 +15,10 @@ def test_underscore_predict_matches_logistic_of_linear_combo():
     assert np.allclose(p, expected)
 
 
-def test_logistic_stub_raises():
+def test_logistic_stub_constructs_then_raises():
+    # Construction must succeed (uniform contract); failure is deferred to use.
+    model = ModelFactory("logistic")(coefficients={"intercept": 0.0})
     with pytest.raises(NotImplementedError):
-        ModelFactory("logistic")().fit(pd.DataFrame(), pd.Series(dtype=int))
+        model.predict_proba(pd.DataFrame())
+    with pytest.raises(NotImplementedError):
+        model.fit(pd.DataFrame(), pd.Series(dtype=int))

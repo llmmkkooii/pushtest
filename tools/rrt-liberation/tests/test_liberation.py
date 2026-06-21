@@ -60,3 +60,11 @@ def test_label_outcome_7d_success_when_no_restart():
     attempts = find_attempts(ev, min_off_hours=24)
     labeled = label_outcome(attempts, ev, horizon_hours=7 * 24)
     assert labeled.iloc[0]["success"] == 1
+
+
+def test_label_outcome_restart_exactly_at_deadline_is_failure():
+    # restart starttime == attempt_time + horizon -> within (closed right bound) -> failure
+    ev = _events([(0, 24), (24 + 7 * 24, 24 + 7 * 24 + 24)])
+    attempts = find_attempts(ev, min_off_hours=24)
+    labeled = label_outcome(attempts, ev, horizon_hours=7 * 24)
+    assert labeled.iloc[0]["success"] == 0

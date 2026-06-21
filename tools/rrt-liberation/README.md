@@ -12,7 +12,7 @@ study. Iteration 1 implements a MIMIC vertical slice with the UNDERSCORE benchma
 Artifacts (`table1.csv`, `flow.txt`, `calibration.png`) are written to `outputs/`
 (gitignored). Note: the current config writes to a fixed `outputs/` dir, so repeated
 runs overwrite prior artifacts; Hydra still records each run's config under
-`outputs/<date>/<time>/.hydra/`. Timestamped artifact dirs are an iteration-2 改善.
+`outputs/<date>/<time>/.hydra/`. Timestamped artifact dirs are an iteration-2 improvement.
 
 ## PHI boundary (read before using real data)
 

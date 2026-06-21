@@ -22,6 +22,10 @@ def build_features(
     """
     feats = cohort.copy()
     for name in predictors:
+        # NOTE (iteration-1 limitation): this is a stay-level mean of urine output,
+        # NOT yet windowed to the 24h before the attempt time. Per-attempt time
+        # anchoring is iteration-2 work; the column name is kept for config/coef
+        # alignment with UNDERSCORE.
         if name == "urine_output_24h":
             uo = (
                 labs[labs["itemid"] == _URINE_ITEMID]
