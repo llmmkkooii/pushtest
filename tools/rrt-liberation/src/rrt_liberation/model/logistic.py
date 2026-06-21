@@ -49,9 +49,11 @@ class LogisticModel(BaseModel):
         self.preprocessor.fit(X[self.predictors], self.predictors)
         Z = self.preprocessor.transform(X[self.predictors])
         self._feature_order = list(Z.columns)
-        lr = LogisticRegression(
-            penalty=self.penalty, C=self.C, max_iter=self.max_iter, solver="lbfgs"
-        )
+        effective_C = self.C if self.penalty is not None else float("inf")
+        lr_kwargs: Dict[str, object] = {"C": effective_C, "max_iter": self.max_iter, "solver": "lbfgs"}
+        if self.penalty is not None:
+            lr_kwargs["penalty"] = self.penalty
+        lr = LogisticRegression(**lr_kwargs)
         lr.fit(Z.to_numpy(), y_arr)
         self.coefficients = {
             name: float(c) for name, c in zip(self._feature_order, lr.coef_[0])
