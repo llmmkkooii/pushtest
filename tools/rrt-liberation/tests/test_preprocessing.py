@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import pytest
 
 from rrt_liberation.preprocessing import Preprocessor
 
@@ -45,7 +46,35 @@ def test_transform_does_not_add_new_flag_for_external_missing():
 
 def test_transform_raises_on_missing_predictor():
     pp = Preprocessor().fit(_frame(), ["a", "b"])
-    import pytest
-
     with pytest.raises(KeyError):
         pp.transform(pd.DataFrame({"a": [1.0]}))  # 'b' absent
+
+
+def test_transform_before_fit_raises_runtime_error():
+    pp = Preprocessor()
+    with pytest.raises(RuntimeError):
+        pp.transform(_frame())
+
+
+def test_to_dict_from_dict_roundtrip_produces_identical_transform():
+    """External validation contract: serialized stats must reproduce exact transform."""
+    pp = Preprocessor().fit(_frame(), ["a", "b"])
+    z1 = pp.transform(_frame())
+
+    pp2 = Preprocessor.from_dict(pp.to_dict(), ["a", "b"])
+    z2 = pp2.transform(_frame())
+
+    pd.testing.assert_frame_equal(z1, z2)
+
+
+def test_fit_raises_on_missing_predictor_column():
+    """fit should give a clear KeyError when a predictor column is absent."""
+    with pytest.raises(KeyError):
+        Preprocessor().fit(_frame(), ["a", "b", "c_nonexistent"])
+
+
+def test_all_nan_column_raises_on_fit():
+    """A fully-NaN predictor yields NaN median -> imputation leaves NaN -> guard required."""
+    bad = pd.DataFrame({"a": [np.nan, np.nan], "b": [1.0, 2.0]})
+    with pytest.raises(ValueError, match="all-NaN"):
+        Preprocessor().fit(bad, ["a", "b"])
