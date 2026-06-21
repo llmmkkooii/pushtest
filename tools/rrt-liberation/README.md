@@ -27,7 +27,14 @@ runs overwrite prior artifacts; Hydra still records each run's config under
 
 ## Status
 
-Implemented: MIMIC cohort, liberation labeling, feature builder, UNDERSCORE,
-discrimination + calibration, TRIPOD flow + Table 1.
-Stubbed (iteration 2): dev logistic/tree models, eICU external validation, DCA,
-definition sensitivity (72h/14d) runs.
+Implemented: MIMIC cohort, liberation labeling, feature builder, UNDERSCORE
+benchmark, **development logistic model** (median impute + missingness flags +
+standardization, JSON-persisted, bootstrap optimism-corrected internal validation
+with coefficient CIs), discrimination + calibration, TRIPOD flow + Table 1.
+
+Run the dev model: `uv run python -m pipeline.run model=logistic` -> writes
+`model_logistic.json`, `model_performance.json`, `coefficients.csv` to `outputs/`.
+
+Stubbed (later iteration-2 sub-projects): RF/XGBoost reference model, eICU
+external validation, DCA, definition sensitivity (72h/14d), MICE imputation,
+full MIMIC feature engineering.
