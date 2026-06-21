@@ -12,6 +12,7 @@ __all__ = [
     "make_labs",
     "make_two_class_events",
     "make_two_class_labs",
+    "make_training_frame",
 ]
 
 
@@ -83,3 +84,24 @@ def make_two_class_labs(n_patients: int = 24, seed: int = 42) -> pd.DataFrame:
                      "charttime": _T0, "itemid": 226559,
                      "valuenum": float(rng.integers(200, 1800))})
     return pd.DataFrame(rows)
+
+
+def make_training_frame(n: int = 60, seed: int = 42):
+    """Synthetic multivariate predictors + binary outcome (non-separable, with missingness).
+
+    Returns (X, y). No real patient data. Deterministic by seed.
+    """
+    rng = np.random.default_rng(seed + 11)
+    urine = rng.normal(800.0, 300.0, n)
+    creatinine = rng.normal(2.0, 0.8, n)
+    sofa = rng.integers(0, 12, n).astype(float)
+    # inject ~20% missingness into creatinine
+    creatinine[rng.random(n) < 0.2] = np.nan
+    creat_filled = np.nan_to_num(creatinine, nan=2.0)
+    z = -0.003 * (urine - 800.0) + 0.4 * (creat_filled - 2.0) + 0.1 * (sofa - 6.0)
+    prob = 1.0 / (1.0 + np.exp(-z))
+    y = (rng.random(n) < prob).astype(int)
+    X = pd.DataFrame(
+        {"urine_output_24h": urine, "creatinine": creatinine, "non_renal_sofa": sofa}
+    )
+    return X, pd.Series(y, name="success")
