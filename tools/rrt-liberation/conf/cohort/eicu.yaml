@@ -1,0 +1,4 @@
+name: eicu
+min_off_hours: 24.0
+events_csv: ${paths.data_dir}/eicu/crrt_events.csv
+labs_csv: ${paths.data_dir}/eicu/labs.csv

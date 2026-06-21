@@ -1,0 +1,11 @@
+defaults:
+  - cohort: mimic
+  - liberation: def_7d
+  - features: baseline
+  - model: underscore
+  - _self_
+
+seed: 42
+paths:
+  data_dir: data
+  output_dir: outputs

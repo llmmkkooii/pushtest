@@ -1,0 +1,6 @@
+name: underscore
+# Fill from Chaibi et al., 2026 (Intensive Care Medicine). Placeholder zeros
+# below are NOT the real score and must be replaced before any real-data run.
+coefficients:
+  intercept: 0.0
+  urine_output_24h: 0.0
