@@ -21,22 +21,38 @@ def _events(stops):
     )
 
 
-def test_find_attempts_requires_min_off_hours():
-    # gap of 12h is below 24h threshold -> no attempt; gap after 48h sustained -> attempt
-    ev = _events([(0, 24), (36, 60)])  # 12h gap
-    assert find_attempts(ev, min_off_hours=24).empty
+def test_find_attempts_below_threshold_gap_then_trailing_off():
+    # 12h gap (below 24h) is NOT an attempt, but the trailing sustained off IS.
+    ev = _events([(0, 24), (36, 60)])
+    attempts = find_attempts(ev, min_off_hours=24)
+    assert len(attempts) == 1
+    assert attempts.iloc[0]["attempt_time"] == T0 + pd.Timedelta(hours=60)
 
-    ev2 = _events([(0, 24)])  # then never restarts -> one sustained attempt
-    attempts = find_attempts(ev2, min_off_hours=24)
+
+def test_find_attempts_single_interval_trailing_off_is_attempt():
+    ev = _events([(0, 24)])  # never restarts -> one attempt at 24h
+    attempts = find_attempts(ev, min_off_hours=24)
     assert len(attempts) == 1
     assert attempts.iloc[0]["attempt_time"] == T0 + pd.Timedelta(hours=24)
+
+
+def test_find_attempts_counts_above_threshold_inter_interval_gap():
+    # 48h gap between intervals -> attempt at end of first interval; plus trailing off.
+    ev = _events([(0, 24), (72, 96)])  # gap 24->72 = 48h
+    attempts = find_attempts(ev, min_off_hours=24)
+    assert len(attempts) == 2
+    assert list(attempts["attempt_time"]) == [
+        T0 + pd.Timedelta(hours=24),
+        T0 + pd.Timedelta(hours=96),
+    ]
 
 
 def test_label_outcome_7d_failure_on_restart_within_horizon():
     ev = _events([(0, 24), (24 + 5 * 24, 24 + 7 * 24)])  # restart on day 5
     attempts = find_attempts(ev, min_off_hours=24)
     labeled = label_outcome(attempts, ev, horizon_hours=7 * 24)
-    assert labeled.iloc[0]["success"] == 0  # restart within 7d -> failure
+    # the first attempt (end of first interval, t=24) restarts at t=24+5*24 -> failure
+    assert labeled.iloc[0]["success"] == 0
 
 
 def test_label_outcome_7d_success_when_no_restart():
