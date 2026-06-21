@@ -1,0 +1,5 @@
+name: logistic
+penalty: null
+C: 1.0
+max_iter: 1000
+n_boot: 200
