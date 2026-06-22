@@ -85,3 +85,41 @@ def test_pipeline_logistic_trains_and_reports(tmp_path):
     assert (out_dir / "calibration.png").exists()
     assert "auroc_corrected" in result
     assert "n_boot_used" in result and result["n_boot_used"] > 0
+
+
+def test_pipeline_logistic_six_features(tmp_path):
+    from tests.fixtures.synth import (
+        make_two_class_events,
+        make_two_class_flags,
+        make_two_class_labs,
+    )
+
+    data_dir = tmp_path / "data" / "mimic"
+    data_dir.mkdir(parents=True)
+    make_two_class_events().to_csv(data_dir / "crrt_events.csv", index=False)
+    make_two_class_labs().to_csv(data_dir / "labs.csv", index=False)
+    make_two_class_flags().to_csv(data_dir / "flags.csv", index=False)
+    out_dir = tmp_path / "outputs"
+
+    preds = [
+        "urine_output_24h", "baseline_creatinine", "crrt_duration_hours",
+        "sepsis_shock", "vasopressor", "mechanical_ventilation",
+    ]
+    result = run_pipeline(
+        events_csv=data_dir / "crrt_events.csv",
+        labs_csv=data_dir / "labs.csv",
+        min_off_hours=24.0,
+        liberation_name="def_7d",
+        predictors=preds,
+        model_name="logistic",
+        coefficients={},
+        output_dir=out_dir,
+        seed=42,
+        model_hparams={"penalty": None, "C": 1.0, "max_iter": 1000},
+        n_boot=20,
+        flags_csv=data_dir / "flags.csv",
+    )
+    assert "auroc_corrected" in result and result["n_boot_used"] > 0
+    import pandas as pd
+    coef = pd.read_csv(out_dir / "coefficients.csv")
+    assert len(coef) >= 6
