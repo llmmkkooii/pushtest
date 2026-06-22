@@ -15,6 +15,8 @@ __all__ = [
     "make_training_frame",
     "make_eicu_events",
     "make_eicu_labs",
+    "make_two_class_flags",
+    "make_eicu_flags",
 ]
 
 
@@ -78,13 +80,16 @@ def make_two_class_events(n_patients: int = 24, seed: int = 42) -> pd.DataFrame:
 
 
 def make_two_class_labs(n_patients: int = 24, seed: int = 42) -> pd.DataFrame:
-    """Urine values overlapping across outcome groups (not separable)."""
+    """Urine + creatinine, canonical labs schema. Some creatinine missing."""
     rng = np.random.default_rng(seed + 7)
     rows = []
     for i in range(n_patients):
-        rows.append({"subject_id": 1000 + i, "stay_id": 2000 + i,
-                     "charttime": _T0, "itemid": 226559,
-                     "valuenum": float(rng.integers(200, 1800))})
+        sid, stid = 1000 + i, 2000 + i
+        rows.append({"subject_id": sid, "stay_id": stid, "charttime": _T0,
+                     "itemid": 226559, "valuenum": float(rng.integers(200, 1800))})
+        if i % 5 != 0:
+            rows.append({"subject_id": sid, "stay_id": stid, "charttime": _T0,
+                         "itemid": 50912, "valuenum": float(rng.integers(50, 400)) / 100.0})
     return pd.DataFrame(rows)
 
 
@@ -125,24 +130,44 @@ def make_eicu_events(n_patients: int = 24, seed: int = 42) -> pd.DataFrame:
 
 
 def make_eicu_labs(n_patients: int = 24, seed: int = 42) -> pd.DataFrame:
-    """Synthetic eICU urine output, emitted in the CANONICAL labs schema.
-
-    Keyed by stay_id == patientunitstayid with itemid 226559 so the existing
-    build_features reads it unchanged.
-    """
+    """eICU urine + creatinine, canonical labs schema. Some creatinine missing."""
     rng = np.random.default_rng(seed + 29)
     rows = []
     for i in range(n_patients):
         pid = 5000 + i
-        rows.append(
-            {
-                "subject_id": pid,
-                "stay_id": pid,
-                "charttime": _T0,
-                "itemid": 226559,
-                "valuenum": float(rng.integers(200, 1800)),
-            }
-        )
+        rows.append({"subject_id": pid, "stay_id": pid, "charttime": _T0,
+                     "itemid": 226559, "valuenum": float(rng.integers(200, 1800))})
+        if i % 5 != 0:
+            rows.append({"subject_id": pid, "stay_id": pid, "charttime": _T0,
+                         "itemid": 50912, "valuenum": float(rng.integers(50, 400)) / 100.0})
+    return pd.DataFrame(rows)
+
+
+def make_two_class_flags(n_patients: int = 24, seed: int = 42) -> pd.DataFrame:
+    """Canonical per-stay binary flags for the MIMIC two-class cohort."""
+    rng = np.random.default_rng(seed + 13)
+    rows = []
+    for i in range(n_patients):
+        rows.append({
+            "stay_id": 2000 + i,
+            "sepsis_shock": int(rng.integers(0, 2)),
+            "vasopressor": int(rng.integers(0, 2)),
+            "mechanical_ventilation": int(rng.integers(0, 2)),
+        })
+    return pd.DataFrame(rows)
+
+
+def make_eicu_flags(n_patients: int = 24, seed: int = 42) -> pd.DataFrame:
+    """Canonical per-stay binary flags for the eICU cohort (stay_id == patientunitstayid)."""
+    rng = np.random.default_rng(seed + 17)
+    rows = []
+    for i in range(n_patients):
+        rows.append({
+            "stay_id": 5000 + i,
+            "sepsis_shock": int(rng.integers(0, 2)),
+            "vasopressor": int(rng.integers(0, 2)),
+            "mechanical_ventilation": int(rng.integers(0, 2)),
+        })
     return pd.DataFrame(rows)
 
 
