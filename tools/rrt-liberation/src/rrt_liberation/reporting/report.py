@@ -6,6 +6,7 @@ import logging
 from pathlib import Path
 from typing import Dict
 
+import numpy as np
 import pandas as pd
 
 logger = logging.getLogger(__name__)
@@ -42,3 +43,18 @@ def write_flow(counts: Dict[str, int], path: str | Path) -> None:
     lines = [f"{k}: {v}" for k, v in counts.items()]
     path.write_text("\n".join(lines) + "\n")
     logger.info("Wrote flow summary to %s", path)
+
+
+def build_coefficient_table(coef_ci: Dict[str, Dict[str, float]]) -> pd.DataFrame:
+    """Coefficient table with odds ratios. CI bounds are exp-transformed betas."""
+    rows: Dict[str, Dict[str, float]] = {}
+    for name, ci in coef_ci.items():
+        beta = float(ci["point"])
+        rows[name] = {
+            "beta": beta,
+            "odds_ratio": float(np.exp(beta)),
+            "ci_low": float(np.exp(ci["ci_low"])),
+            "ci_high": float(np.exp(ci["ci_high"])),
+        }
+    table = pd.DataFrame(rows).T
+    return table[["beta", "odds_ratio", "ci_low", "ci_high"]]

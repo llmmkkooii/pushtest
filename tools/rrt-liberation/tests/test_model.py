@@ -1,6 +1,5 @@
 import numpy as np
 import pandas as pd
-import pytest
 
 from rrt_liberation.model import ModelFactory
 
@@ -15,10 +14,5 @@ def test_underscore_predict_matches_logistic_of_linear_combo():
     assert np.allclose(p, expected)
 
 
-def test_logistic_stub_constructs_then_raises():
-    # Construction must succeed (uniform contract); failure is deferred to use.
-    model = ModelFactory("logistic")(coefficients={"intercept": 0.0})
-    with pytest.raises(NotImplementedError):
-        model.predict_proba(pd.DataFrame())
-    with pytest.raises(NotImplementedError):
-        model.fit(pd.DataFrame(), pd.Series(dtype=int))
+# test_logistic_stub_constructs_then_raises was removed in Task 4:
+# LogisticModel is now fully implemented (see tests/test_logistic_model.py).

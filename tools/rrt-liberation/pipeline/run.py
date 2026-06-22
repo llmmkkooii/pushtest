@@ -7,10 +7,11 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Optional, cast as _cast
 
 import hydra
 import numpy as np
+import pandas as pd
 from omegaconf import DictConfig, OmegaConf
 
 from rrt_liberation.cohort import CohortFactory
@@ -19,11 +20,15 @@ from rrt_liberation.evaluation import (
     calibration_slope_intercept,
     save_calibration_plot,
 )
+from rrt_liberation.evaluation.internal_validation import internal_validation
 from rrt_liberation.features import build_features
 from rrt_liberation.liberation import get_horizon
 from rrt_liberation.model import ModelFactory
-from rrt_liberation.reporting import build_table1, write_flow
-from rrt_liberation.utils import read_csv, set_seed, write_csv
+from rrt_liberation.model.base import BaseModel
+from rrt_liberation.model.logistic import LogisticModel
+from rrt_liberation.model.persistence import save_model_json
+from rrt_liberation.reporting import build_coefficient_table, build_table1, write_flow
+from rrt_liberation.utils import read_csv, set_seed, write_csv, write_json
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +44,9 @@ def run_pipeline(
     output_dir: str | Path,
     seed: int = 42,
     cohort_name: str = "mimic",
+    model_hparams: Optional[Dict[str, object]] = None,
+    n_boot: int = 200,
+    created_utc: Optional[str] = None,
 ) -> Dict[str, float]:
     """Run the vertical slice and return key metrics."""
     set_seed(seed)
@@ -56,9 +64,57 @@ def run_pipeline(
 
     feats = build_features(cohort, labs=labs, predictors=predictors)
 
-    model = ModelFactory(model_name)(coefficients=coefficients)
-    proba = model.predict_proba(feats[predictors])
     y = feats["success"].to_numpy()
+
+    if model_name == "logistic":
+        if len(np.unique(y)) < 2:
+            raise ValueError("logistic model requires two outcome classes to train")
+        hp = model_hparams or {}
+        hp_penalty: Optional[str] = _cast(Optional[str], hp.get("penalty"))
+        hp_C: float = float(_cast(float, hp.get("C", 1.0)))
+        hp_max_iter: int = int(_cast(int, hp.get("max_iter", 1000)))
+
+        def fit_fn(x_tr: pd.DataFrame, y_tr: np.ndarray) -> LogisticModel:
+            return LogisticModel(
+                predictors=predictors,
+                penalty=hp_penalty,
+                C=hp_C,
+                max_iter=hp_max_iter,
+            ).fit(x_tr, y_tr)
+
+        model = fit_fn(feats[predictors], y)
+        save_model_json(model, output_dir / "model_logistic.json", created_utc=created_utc)
+        iv = internal_validation(fit_fn, feats[predictors], y, n_boot=n_boot, seed=seed)
+        iv_auroc = _cast(Dict[str, float], iv["auroc"])
+        iv_calib = _cast(Dict[str, float], iv["calib_slope"])
+        iv_coefs = _cast(Dict[str, Dict[str, float]], iv["coefficients"])
+        iv_nboot = int(_cast(int, iv["n_boot_used"]))
+
+        save_calibration_plot(y, model.predict_proba(feats[predictors]), output_dir / "calibration.png")
+        write_json(
+            {"auroc": iv_auroc, "calib_slope": iv_calib, "n_boot_used": iv_nboot},
+            output_dir / "model_performance.json",
+        )
+        write_csv(
+            build_coefficient_table(iv_coefs).reset_index(names="predictor"),
+            output_dir / "coefficients.csv",
+        )
+        write_csv(build_table1(feats).reset_index(names="variable"), output_dir / "table1.csv")
+        write_flow(
+            {"raw_episodes": int(len(events)), "attempts": int(len(cohort)), "successes": int(y.sum())},
+            output_dir / "flow.txt",
+        )
+        metrics = {
+            "auroc": float(iv_auroc["apparent"]),
+            "auroc_corrected": float(iv_auroc["corrected"]),
+            "calib_slope_corrected": float(iv_calib["corrected"]),
+            "n_boot_used": iv_nboot,
+        }
+        logger.info("Logistic pipeline metrics: %s", metrics)
+        return metrics
+
+    base_model: BaseModel = ModelFactory(model_name)(coefficients=coefficients)
+    proba = base_model.predict_proba(feats[predictors])
 
     if len(np.unique(y)) > 1:
         disc = auroc_with_ci(y, proba, n_boot=200, seed=seed)
@@ -91,6 +147,7 @@ def run_pipeline(
 @hydra.main(version_base=None, config_path="../conf", config_name="config")
 def main(cfg: DictConfig) -> None:
     set_seed(cfg.seed)
+    is_logistic = cfg.model.name == "logistic"
     run_pipeline(
         events_csv=cfg.cohort.events_csv,
         labs_csv=cfg.cohort.labs_csv,
@@ -98,10 +155,16 @@ def main(cfg: DictConfig) -> None:
         liberation_name=cfg.liberation.name,
         predictors=list(cfg.features.predictors),
         model_name=cfg.model.name,
-        coefficients=OmegaConf.to_container(cfg.model.coefficients),  # type: ignore[arg-type]
+        coefficients=({} if is_logistic else OmegaConf.to_container(cfg.model.coefficients)),  # type: ignore[arg-type]
         output_dir=cfg.paths.output_dir,
         seed=cfg.seed,
         cohort_name=cfg.cohort.name,
+        model_hparams=(
+            {"penalty": cfg.model.penalty, "C": cfg.model.C, "max_iter": cfg.model.max_iter}
+            if is_logistic
+            else None
+        ),
+        n_boot=(cfg.model.n_boot if is_logistic else 200),
     )
 
 
