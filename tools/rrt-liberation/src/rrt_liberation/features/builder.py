@@ -18,7 +18,10 @@ def build_features(
     """Attach each requested predictor (registered feature) to the cohort.
 
     `sources` provides the tables features read: {"labs", "events", "flags"}.
-    Unknown predictors are created as NaN columns so the contract stays explicit.
+    Lab/event features require their source key (a missing one is a config error
+    and raises KeyError); binary flag features treat a missing "flags" source as
+    all-zero. Unknown predictors are created as NaN columns so the contract stays
+    explicit.
     """
     feats = cohort.copy()
     for name in predictors:
