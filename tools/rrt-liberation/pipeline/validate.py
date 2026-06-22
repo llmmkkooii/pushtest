@@ -6,6 +6,7 @@ config to it. This entrypoint never trains a model.
 
 from __future__ import annotations
 
+import json
 import logging
 from pathlib import Path
 from typing import Dict, List
@@ -58,6 +59,9 @@ def run_external_validation(
     )
     payload = dict(res)
     payload["source_model"] = str(fixed_model_path)
+    payload["source_predictors"] = predictors
+    raw = json.loads(Path(fixed_model_path).read_text())
+    payload["source_model_created_utc"] = raw.get("created_utc")
     write_json(payload, output_dir / "external_validation.json")
     write_csv(build_table1(feats).reset_index(names="variable"), output_dir / "external_table1.csv")
 

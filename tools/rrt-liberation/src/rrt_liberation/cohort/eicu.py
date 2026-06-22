@@ -16,6 +16,10 @@ logger = logging.getLogger(__name__)
 # Deterministic; only relative differences matter to the liberation logic.
 _EICU_T0 = pd.Timestamp("2200-01-01")
 
+# eICU treatment offsets are minutes from unit admission. NB: "m" = minutes,
+# "M" = months — keep this named to avoid a one-character regression.
+_OFFSET_UNIT = "m"
+
 
 class EicuCohortBuilder(BaseCohortBuilder):
     """Builds a labeled liberation cohort from eICU-shaped CRRT treatment rows."""
@@ -33,7 +37,7 @@ class EicuCohortBuilder(BaseCohortBuilder):
         out = pd.DataFrame()
         out["subject_id"] = events["patientunitstayid"].to_numpy()
         out["stay_id"] = events["patientunitstayid"].to_numpy()
-        out["starttime"] = _EICU_T0 + pd.to_timedelta(events["treatmentoffset"], unit="m")
-        out["endtime"] = _EICU_T0 + pd.to_timedelta(events["treatmentstopoffset"], unit="m")
+        out["starttime"] = _EICU_T0 + pd.to_timedelta(events["treatmentoffset"], unit=_OFFSET_UNIT)
+        out["endtime"] = _EICU_T0 + pd.to_timedelta(events["treatmentstopoffset"], unit=_OFFSET_UNIT)
         out["modality"] = "CVVHDF"
         return out
