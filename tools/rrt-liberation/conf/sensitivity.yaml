@@ -1,0 +1,15 @@
+defaults:
+  - cohort: mimic
+  - features: baseline
+  - model: logistic
+  - _self_
+
+seed: 42
+n_boot: 200
+definitions:
+  - def_72h
+  - def_7d
+  - def_14d
+paths:
+  data_dir: data
+  output_dir: outputs
