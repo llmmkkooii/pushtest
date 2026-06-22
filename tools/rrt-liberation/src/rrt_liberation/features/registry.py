@@ -59,3 +59,19 @@ def _crrt_duration_hours(cohort: pd.DataFrame, sources: Dict[str, pd.DataFrame])
                 total_h += delta_h
         values.append(total_h)
     return pd.Series(values, index=cohort.index)
+
+
+def _binary_flag(flag_name: str) -> FeatureFn:
+    def fn(cohort: pd.DataFrame, sources: Dict[str, pd.DataFrame]) -> pd.Series:
+        flags = sources.get("flags")
+        if flags is None or flag_name not in getattr(flags, "columns", []):
+            return pd.Series(0, index=cohort.index, dtype=int)
+        mapping = flags.set_index("stay_id")[flag_name]
+        return cohort["stay_id"].map(mapping).fillna(0).astype(int)
+
+    return fn
+
+
+register_feature("sepsis_shock")(_binary_flag("sepsis_shock"))
+register_feature("vasopressor")(_binary_flag("vasopressor"))
+register_feature("mechanical_ventilation")(_binary_flag("mechanical_ventilation"))
