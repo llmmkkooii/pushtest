@@ -18,7 +18,9 @@ from rrt_liberation.cohort import CohortFactory
 from rrt_liberation.evaluation import (
     auroc_with_ci,
     calibration_slope_intercept,
+    decision_curve,
     save_calibration_plot,
+    save_dca_plot,
 )
 from rrt_liberation.evaluation.internal_validation import internal_validation
 from rrt_liberation.features import build_features
@@ -98,6 +100,19 @@ def run_pipeline(
         iv_nboot = int(_cast(int, iv["n_boot_used"]))
 
         save_calibration_plot(y, model.predict_proba(feats[predictors]), output_dir / "calibration.png")
+        dca = decision_curve(y, model.predict_proba(feats[predictors]))
+        write_csv(
+            pd.DataFrame(
+                {
+                    "threshold": dca["thresholds"],
+                    "net_benefit_model": dca["net_benefit_model"],
+                    "net_benefit_all": dca["net_benefit_all"],
+                    "net_benefit_none": dca["net_benefit_none"],
+                }
+            ),
+            output_dir / "dca.csv",
+        )
+        save_dca_plot(dca, output_dir / "dca.png")
         write_json(
             {"auroc": iv_auroc, "calib_slope": iv_calib, "n_boot_used": iv_nboot},
             output_dir / "model_performance.json",
