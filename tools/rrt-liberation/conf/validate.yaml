@@ -1,0 +1,11 @@
+defaults:
+  - cohort: eicu
+  - liberation: def_7d
+  - _self_
+
+seed: 42
+n_boot: 200
+fixed_model_path: outputs/model_logistic.json
+paths:
+  data_dir: data
+  output_dir: outputs

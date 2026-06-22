@@ -13,6 +13,8 @@ __all__ = [
     "make_two_class_events",
     "make_two_class_labs",
     "make_training_frame",
+    "make_eicu_events",
+    "make_eicu_labs",
 ]
 
 
@@ -83,6 +85,64 @@ def make_two_class_labs(n_patients: int = 24, seed: int = 42) -> pd.DataFrame:
         rows.append({"subject_id": 1000 + i, "stay_id": 2000 + i,
                      "charttime": _T0, "itemid": 226559,
                      "valuenum": float(rng.integers(200, 1800))})
+    return pd.DataFrame(rows)
+
+
+_EICU_OFFSET0 = 0  # eICU offsets are minutes from unit admission
+
+
+def make_eicu_events(n_patients: int = 24, seed: int = 42) -> pd.DataFrame:
+    """Synthetic eICU-shaped CRRT treatment rows (minute offsets). Two-class cohort.
+
+    Half the patients restart CRRT within 7 days (failure) before a final
+    sustained off (success); the rest never restart. No real data; deterministic.
+    """
+    rng = np.random.default_rng(seed + 23)
+    rows = []
+    for i in range(n_patients):
+        pid = 5000 + i
+        start0 = int(rng.integers(0, 12)) * 60          # minutes
+        stop0 = start0 + 24 * 60                          # 24h on
+        rows.append(
+            {
+                "patientunitstayid": pid,
+                "treatmentoffset": start0,
+                "treatmentstopoffset": stop0,
+                "treatmentstring": "renal|dialysis|C V V H D",
+            }
+        )
+        if i % 2 == 0:
+            r_start = stop0 + int(rng.integers(48, 120)) * 60  # restart within 7d
+            rows.append(
+                {
+                    "patientunitstayid": pid,
+                    "treatmentoffset": r_start,
+                    "treatmentstopoffset": r_start + 24 * 60,
+                    "treatmentstring": "renal|dialysis|C V V H D",
+                }
+            )
+    return pd.DataFrame(rows)
+
+
+def make_eicu_labs(n_patients: int = 24, seed: int = 42) -> pd.DataFrame:
+    """Synthetic eICU urine output, emitted in the CANONICAL labs schema.
+
+    Keyed by stay_id == patientunitstayid with itemid 226559 so the existing
+    build_features reads it unchanged.
+    """
+    rng = np.random.default_rng(seed + 29)
+    rows = []
+    for i in range(n_patients):
+        pid = 5000 + i
+        rows.append(
+            {
+                "subject_id": pid,
+                "stay_id": pid,
+                "charttime": _T0,
+                "itemid": 226559,
+                "valuenum": float(rng.integers(200, 1800)),
+            }
+        )
     return pd.DataFrame(rows)
 
 
