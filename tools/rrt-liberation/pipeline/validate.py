@@ -49,7 +49,7 @@ def run_external_validation(
     cohort = builder.build(events=events, horizon_hours=horizon)
 
     predictors: List[str] = list(model.predictors) if model.predictors is not None else []
-    feats = build_features(cohort, labs=labs, predictors=predictors)
+    feats = build_features(cohort, {"labs": labs}, predictors)
     y = feats["success"].to_numpy()
 
     res = external_validate(model, feats[predictors], feats["success"], n_boot=n_boot, seed=seed)

@@ -62,7 +62,7 @@ def run_pipeline(
     builder = CohortFactory(cohort_name)(min_off_hours=min_off_hours)
     cohort = builder.build(events=events, horizon_hours=horizon)
 
-    feats = build_features(cohort, labs=labs, predictors=predictors)
+    feats = build_features(cohort, {"labs": labs}, predictors)
 
     y = feats["success"].to_numpy()
 
