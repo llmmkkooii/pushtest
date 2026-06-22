@@ -4,3 +4,8 @@ name: underscore
 coefficients:
   intercept: 0.0
   urine_output_24h: 0.0
+  baseline_creatinine: 0.0
+  crrt_duration_hours: 0.0
+  sepsis_shock: 0.0
+  vasopressor: 0.0
+  mechanical_ventilation: 0.0

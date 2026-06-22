@@ -9,9 +9,10 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 import hydra
+import pandas as pd
 from omegaconf import DictConfig
 
 from rrt_liberation.cohort import CohortFactory
@@ -36,6 +37,7 @@ def run_external_validation(
     output_dir: str | Path,
     n_boot: int = 200,
     seed: int = 42,
+    flags_csv: Optional[str | Path] = None,
 ) -> Dict[str, object]:
     """Load a fixed model and validate it on an external cohort (no retraining)."""
     set_seed(seed)
@@ -49,7 +51,13 @@ def run_external_validation(
     cohort = builder.build(events=events, horizon_hours=horizon)
 
     predictors: List[str] = list(model.predictors) if model.predictors is not None else []
-    feats = build_features(cohort, labs=labs, predictors=predictors)
+    sources: Dict[str, pd.DataFrame] = {
+        "labs": labs,
+        "events": builder.to_canonical_events(events),
+    }
+    if flags_csv is not None:
+        sources["flags"] = read_csv(flags_csv)
+    feats = build_features(cohort, sources, predictors)
     y = feats["success"].to_numpy()
 
     res = external_validate(model, feats[predictors], feats["success"], n_boot=n_boot, seed=seed)
@@ -82,6 +90,7 @@ def main(cfg: DictConfig) -> None:
         output_dir=cfg.paths.output_dir,
         n_boot=cfg.n_boot,
         seed=cfg.seed,
+        flags_csv=cfg.cohort.get("flags_csv"),
     )
 
 

@@ -47,6 +47,7 @@ def run_pipeline(
     model_hparams: Optional[Dict[str, object]] = None,
     n_boot: int = 200,
     created_utc: Optional[str] = None,
+    flags_csv: Optional[str | Path] = None,
 ) -> Dict[str, float]:
     """Run the vertical slice and return key metrics."""
     set_seed(seed)
@@ -62,7 +63,13 @@ def run_pipeline(
     builder = CohortFactory(cohort_name)(min_off_hours=min_off_hours)
     cohort = builder.build(events=events, horizon_hours=horizon)
 
-    feats = build_features(cohort, labs=labs, predictors=predictors)
+    sources: Dict[str, pd.DataFrame] = {
+        "labs": labs,
+        "events": builder.to_canonical_events(events),
+    }
+    if flags_csv is not None:
+        sources["flags"] = read_csv(flags_csv)
+    feats = build_features(cohort, sources, predictors)
 
     y = feats["success"].to_numpy()
 
@@ -165,6 +172,7 @@ def main(cfg: DictConfig) -> None:
             else None
         ),
         n_boot=(cfg.model.n_boot if is_logistic else 200),
+        flags_csv=cfg.cohort.get("flags_csv"),
     )
 
 

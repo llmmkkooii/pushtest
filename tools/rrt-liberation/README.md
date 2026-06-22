@@ -27,17 +27,19 @@ runs overwrite prior artifacts; Hydra still records each run's config under
 
 ## Status
 
-Implemented: MIMIC cohort, liberation labeling, feature builder, UNDERSCORE
+Implemented: MIMIC/eICU cohort, liberation labeling, **UNDERSCORE-6 feature
+registry** (urine, baseline creatinine, CRRT duration, sepsis shock, vasopressor,
+mechanical ventilation; DB-independent over labs/events/flags sources), UNDERSCORE
 benchmark, development logistic model (JSON-persisted, bootstrap optimism-corrected
-internal validation), **eICU external validation** (fixed model applied to an
-eICU cohort, no retraining), discrimination + calibration, TRIPOD flow + Table 1.
+internal validation), eICU external validation, discrimination + calibration,
+TRIPOD flow + Table 1.
 
-Run the dev model: `uv run python -m pipeline.run model=logistic` -> writes
+Run the dev model (6 features): `uv run python -m pipeline.run model=logistic` -> writes
 `model_logistic.json`, `model_performance.json`, `coefficients.csv` to `outputs/`.
 
 Run external validation: `uv run python -m pipeline.validate fixed_model_path=outputs/model_logistic.json cohort=eicu`
 -> writes `external_validation.json`, `calibration_external.png`, `external_table1.csv` to `outputs/`.
 
-Stubbed (later iteration-2 sub-projects): RF/XGBoost reference model, UNDERSCORE/
-urine external comparison, DCA, definition sensitivity (72h/14d), MICE imputation,
-full MIMIC/eICU feature engineering, AmsterdamUMCdb.
+Stubbed (later sub-projects): RF/XGBoost reference model, UNDERSCORE/urine external
+comparison, remaining proposal-section-7 predictors, real MIMIC/eICU SQL extraction,
+24h urine windowing, DCA, definition sensitivity (72h/14d), MICE, AmsterdamUMCdb.

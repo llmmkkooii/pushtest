@@ -16,7 +16,8 @@ class MimicCohortBuilder(BaseCohortBuilder):
     """Reconstructs CRRT episodes and labels liberation attempts for MIMIC-IV."""
 
     def build(self, events: pd.DataFrame, horizon_hours: float) -> pd.DataFrame:
-        attempts = find_attempts(events, min_off_hours=self.min_off_hours)
-        labeled = label_outcome(attempts, events, horizon_hours=horizon_hours)
+        canonical = self.to_canonical_events(events)
+        attempts = find_attempts(canonical, min_off_hours=self.min_off_hours)
+        labeled = label_outcome(attempts, canonical, horizon_hours=horizon_hours)
         logger.info("MIMIC cohort: %d attempts", len(labeled))
         return labeled

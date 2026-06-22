@@ -1,2 +1,7 @@
 predictors:
   - urine_output_24h
+  - baseline_creatinine
+  - crrt_duration_hours
+  - sepsis_shock
+  - vasopressor
+  - mechanical_ventilation
