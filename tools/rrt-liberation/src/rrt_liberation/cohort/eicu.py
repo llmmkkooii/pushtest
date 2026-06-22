@@ -25,14 +25,13 @@ class EicuCohortBuilder(BaseCohortBuilder):
     """Builds a labeled liberation cohort from eICU-shaped CRRT treatment rows."""
 
     def build(self, events: pd.DataFrame, horizon_hours: float) -> pd.DataFrame:
-        canonical = self._to_canonical(events)
+        canonical = self.to_canonical_events(events)
         attempts = find_attempts(canonical, min_off_hours=self.min_off_hours)
         labeled = label_outcome(attempts, canonical, horizon_hours=horizon_hours)
         logger.info("eICU cohort: %d attempts", len(labeled))
         return labeled
 
-    @staticmethod
-    def _to_canonical(events: pd.DataFrame) -> pd.DataFrame:
+    def to_canonical_events(self, events: pd.DataFrame) -> pd.DataFrame:
         """Map eICU columns + minute offsets to the canonical events schema."""
         out = pd.DataFrame()
         out["subject_id"] = events["patientunitstayid"].to_numpy()
