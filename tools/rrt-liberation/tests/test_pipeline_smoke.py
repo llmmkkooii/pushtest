@@ -123,3 +123,5 @@ def test_pipeline_logistic_six_features(tmp_path):
     import pandas as pd
     coef = pd.read_csv(out_dir / "coefficients.csv")
     assert len(coef) >= 6
+    assert (out_dir / "dca.csv").exists()
+    assert (out_dir / "dca.png").exists()
