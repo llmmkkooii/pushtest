@@ -1,0 +1,21 @@
+defaults:
+  - cohort: eicu
+  - liberation: def_7d
+  - features: baseline
+  - _self_
+
+seed: 42
+n_boot: 200
+fixed_model_path: outputs/model_logistic.json
+urine_model_path: outputs/urine_model_logistic.json
+underscore_coefficients:
+  intercept: 0.0
+  urine_output_24h: 0.0
+  baseline_creatinine: 0.0
+  crrt_duration_hours: 0.0
+  sepsis_shock: 0.0
+  vasopressor: 0.0
+  mechanical_ventilation: 0.0
+paths:
+  data_dir: data
+  output_dir: outputs

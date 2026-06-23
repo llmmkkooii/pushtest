@@ -30,15 +30,16 @@ runs overwrite prior artifacts; Hydra still records each run's config under
 Implemented: MIMIC/eICU cohort, liberation labeling, UNDERSCORE-6 feature registry,
 UNDERSCORE benchmark, development logistic model (JSON-persisted, bootstrap
 optimism-corrected internal validation), eICU external validation, liberation-
-definition sensitivity analysis (72h/7d/14d), **decision curve analysis** (net
-benefit), discrimination + calibration, TRIPOD flow + Table 1.
+definition sensitivity (72h/7d/14d), decision curve analysis, **external benchmark
+comparison** (dev vs urine-only vs UNDERSCORE with external DCA), discrimination +
+calibration, TRIPOD flow + Table 1.
 
-Run the dev model: `uv run python -m pipeline.run model=logistic` -> writes
-`model_logistic.json`, `model_performance.json`, `coefficients.csv`, `calibration.png`,
-`dca.csv`, `dca.png` to `outputs/`.
+Run the dev model: `uv run python -m pipeline.run model=logistic`
 Run external validation: `uv run python -m pipeline.validate fixed_model_path=outputs/model_logistic.json cohort=eicu`
 Run definition sensitivity: `uv run python -m pipeline.sensitivity cohort=mimic`
+Run benchmark comparison: `uv run python -m pipeline.benchmark cohort=eicu`
+-> writes `benchmark_comparison.csv`, `dca_external.csv`, `dca_external.png` to `outputs/`.
 
-Stubbed (later sub-projects): RF/XGBoost reference model, UNDERSCORE/urine external
-comparison, external-cohort DCA, remaining proposal-section-7 predictors, real
-MIMIC/eICU SQL extraction, 24h urine windowing, MICE, AmsterdamUMCdb.
+Stubbed (later sub-projects): RF/XGBoost reference model, remaining proposal-
+section-7 predictors, real MIMIC/eICU SQL extraction, 24h urine windowing, MICE,
+AmsterdamUMCdb.
