@@ -111,6 +111,58 @@ def build_mimic_labs(
     return pd.concat([uo[cols], cr_out[cols]], ignore_index=True)
 
 
-def build_mimic_flags(*args: object, **kwargs: object) -> pd.DataFrame:
-    """Stub — implemented in Task 3."""
-    raise NotImplementedError("build_mimic_flags is implemented in Task 3")
+def build_mimic_flags(
+    stays: pd.DataFrame,
+    diagnoses_icd: pd.DataFrame,
+    inputevents: pd.DataFrame,
+    ventilation: pd.DataFrame,
+    septic_shock_icd: Sequence[str],
+    vasopressor_itemids: Sequence[int],
+    vent_itemids: Sequence[int],
+) -> pd.DataFrame:
+    """Per-stay binary flags: septic shock (ICD via hadm), vasopressor, ventilation.
+
+    Args:
+        stays: ICU stays table with columns ``subject_id``, ``hadm_id``, ``stay_id``,
+            ``intime``, ``outtime``.
+        diagnoses_icd: MIMIC-IV diagnoses_icd table with columns ``hadm_id``,
+            ``icd_code``.  Joined to stays via hadm_id to derive sepsis_shock.
+        inputevents: MIMIC-IV inputevents table with columns ``stay_id``, ``itemid``.
+            Used to flag vasopressor administration.
+        ventilation: MIMIC-IV ventilation table with columns ``stay_id``, ``itemid``.
+            Used to flag mechanical ventilation.
+        septic_shock_icd: ICD codes (strings) that indicate septic shock (e.g.
+            ``["R6521"]``).
+        vasopressor_itemids: inputevents item IDs for vasopressors (e.g. [221906]).
+        vent_itemids: ventilation item IDs for mechanical ventilation (e.g. [225792]).
+
+    Returns:
+        DataFrame with columns ``stay_id``, ``sepsis_shock``, ``vasopressor``,
+        ``mechanical_ventilation`` (all 0/1 int), one row per unique stay_id in
+        ``stays``.
+    """
+    out = pd.DataFrame({"stay_id": stays["stay_id"].drop_duplicates().to_numpy()})
+
+    shock_codes = {str(c) for c in septic_shock_icd}
+    shock_hadm = set(
+        diagnoses_icd[diagnoses_icd["icd_code"].astype(str).isin(shock_codes)]["hadm_id"]
+    )
+    stay_hadm = stays[["stay_id", "hadm_id"]].drop_duplicates().copy()
+    stay_hadm["sepsis_shock"] = stay_hadm["hadm_id"].isin(shock_hadm).astype(int)
+    out = out.merge(stay_hadm[["stay_id", "sepsis_shock"]], on="stay_id", how="left")
+    out["sepsis_shock"] = out["sepsis_shock"].fillna(0).astype(int)
+
+    vaso_stays = set(inputevents[inputevents["itemid"].isin(list(vasopressor_itemids))]["stay_id"])
+    out["vasopressor"] = out["stay_id"].isin(vaso_stays).astype(int)
+
+    vent_stays = set(ventilation[ventilation["itemid"].isin(list(vent_itemids))]["stay_id"])
+    out["mechanical_ventilation"] = out["stay_id"].isin(vent_stays).astype(int)
+
+    logger.debug(
+        "Flags: %d stays, sepsis_shock=%d, vasopressor=%d, mechanical_ventilation=%d",
+        len(out),
+        out["sepsis_shock"].sum(),
+        out["vasopressor"].sum(),
+        out["mechanical_ventilation"].sum(),
+    )
+    return out[["stay_id", "sepsis_shock", "vasopressor", "mechanical_ventilation"]]

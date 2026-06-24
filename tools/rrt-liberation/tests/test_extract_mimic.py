@@ -1,4 +1,3 @@
-import pytest
 import pandas as pd
 
 from rrt_liberation.extract import build_mimic_crrt_events, build_mimic_labs, build_mimic_flags
@@ -108,6 +107,23 @@ def test_labs_urine_and_creatinine_canonical():
     assert cr.iloc[0]["stay_id"] == 10
 
 
-def test_flags_stub_raises():
-    with pytest.raises(NotImplementedError, match="Task 3"):
-        build_mimic_flags()
+def test_flags_derivation():
+    stays = pd.DataFrame(
+        {"subject_id": [1, 2], "hadm_id": [100, 200], "stay_id": [10, 20],
+         "intime": [T0, T0], "outtime": [T0 + pd.Timedelta(days=2)] * 2}
+    )
+    diagnoses_icd = pd.DataFrame({"hadm_id": [100], "icd_code": ["R6521"]})  # stay 10 only
+    inputevents = pd.DataFrame({"stay_id": [20], "itemid": [221906]})        # stay 20 vasopressor
+    ventilation = pd.DataFrame({"stay_id": [10], "itemid": [225792]})        # stay 10 vent
+    flags = build_mimic_flags(
+        stays, diagnoses_icd, inputevents, ventilation,
+        septic_shock_icd=["R6521"], vasopressor_itemids=[221906], vent_itemids=[225792],
+    )
+    assert list(flags.columns) == [
+        "stay_id", "sepsis_shock", "vasopressor", "mechanical_ventilation"
+    ]
+    by = flags.set_index("stay_id")
+    assert by.loc[10, "sepsis_shock"] == 1 and by.loc[20, "sepsis_shock"] == 0
+    assert by.loc[20, "vasopressor"] == 1 and by.loc[10, "vasopressor"] == 0
+    assert by.loc[10, "mechanical_ventilation"] == 1 and by.loc[20, "mechanical_ventilation"] == 0
+    assert len(flags) == 2
