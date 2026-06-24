@@ -1,5 +1,7 @@
+import numpy as np  # noqa: F401  (kept for parity; remove if ruff flags unused)
 import pandas as pd
 
+from pipeline.run import run_pipeline
 from rrt_liberation.extract import build_mimic_crrt_events, build_mimic_labs, build_mimic_flags
 
 T0 = pd.Timestamp("2150-01-01")
@@ -127,3 +129,68 @@ def test_flags_derivation():
     assert by.loc[20, "vasopressor"] == 1 and by.loc[10, "vasopressor"] == 0
     assert by.loc[10, "mechanical_ventilation"] == 1 and by.loc[20, "mechanical_ventilation"] == 0
     assert len(flags) == 2
+
+
+def _synthetic_mimic_raw(n_stays=12):
+    """Synthetic raw MIMIC tables that yield a 2-class liberation cohort after extraction."""
+    proc, outp, lab, dx, inp, vent, stays = [], [], [], [], [], [], []
+    for i in range(n_stays):
+        subj, hadm, stay = 1000 + i, 2000 + i, 3000 + i
+        stays.append({"subject_id": subj, "hadm_id": hadm, "stay_id": stay,
+                      "intime": T0, "outtime": T0 + pd.Timedelta(days=30)})
+        proc.append({"subject_id": subj, "stay_id": stay, "itemid": 225802,
+                     "starttime": T0, "endtime": T0 + pd.Timedelta(hours=24)})
+        if i % 2 == 0:
+            r0 = 24 + 72
+            proc.append({"subject_id": subj, "stay_id": stay, "itemid": 225802,
+                         "starttime": T0 + pd.Timedelta(hours=r0),
+                         "endtime": T0 + pd.Timedelta(hours=r0 + 24)})
+        outp.append({"stay_id": stay, "itemid": 226559, "value": float(400 + 50 * i)})
+        lab.append({"subject_id": subj, "itemid": 50912, "valuenum": float(1.0 + 0.1 * i),
+                    "charttime": T0 + pd.Timedelta(hours=2)})
+        if i % 3 == 0:
+            dx.append({"hadm_id": hadm, "icd_code": "R6521"})
+        if i % 2 == 0:
+            inp.append({"stay_id": stay, "itemid": 221906})
+        if i % 2 == 1:
+            vent.append({"stay_id": stay, "itemid": 225792})
+    return (
+        pd.DataFrame(proc), pd.DataFrame(outp), pd.DataFrame(lab),
+        pd.DataFrame(dx), pd.DataFrame(inp), pd.DataFrame(vent), pd.DataFrame(stays),
+    )
+
+
+def test_extract_then_train(tmp_path):
+    from rrt_liberation.extract import (
+        build_mimic_crrt_events,
+        build_mimic_flags,
+        build_mimic_labs,
+    )
+
+    proc, outp, lab, dx, inp, vent, stays = _synthetic_mimic_raw()
+    data = tmp_path / "data" / "mimic"
+    data.mkdir(parents=True)
+    build_mimic_crrt_events(proc, [225802], 6.0).to_csv(data / "crrt_events.csv", index=False)
+    build_mimic_labs(outp, lab, stays, [226559], [50912]).to_csv(data / "labs.csv", index=False)
+    build_mimic_flags(
+        stays, dx, inp, vent, ["R6521"], [221906], [225792]
+    ).to_csv(data / "flags.csv", index=False)
+
+    result = run_pipeline(
+        events_csv=data / "crrt_events.csv",
+        labs_csv=data / "labs.csv",
+        min_off_hours=24.0,
+        liberation_name="def_7d",
+        predictors=[
+            "urine_output_24h", "baseline_creatinine", "crrt_duration_hours",
+            "sepsis_shock", "vasopressor", "mechanical_ventilation",
+        ],
+        model_name="logistic",
+        coefficients={},
+        output_dir=tmp_path / "out",
+        seed=42,
+        model_hparams={"penalty": None, "C": 1.0, "max_iter": 1000},
+        n_boot=10,
+        flags_csv=data / "flags.csv",
+    )
+    assert "auroc_corrected" in result and result["n_boot_used"] > 0
