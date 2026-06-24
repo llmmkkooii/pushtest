@@ -76,9 +76,36 @@ def test_overlapping_intervals_keep_max_end():
     assert ev.iloc[0]["endtime"] == T0 + pd.Timedelta(hours=5)
 
 
-def test_labs_stub_raises():
-    with pytest.raises(NotImplementedError, match="Task 2"):
-        build_mimic_labs()
+def test_labs_urine_and_creatinine_canonical():
+    outputevents = pd.DataFrame(
+        {"stay_id": [10, 10], "itemid": [226559, 999], "value": [800.0, 5.0]}
+    )
+    labevents = pd.DataFrame(
+        {
+            "subject_id": [1, 1],
+            "itemid": [50912, 50912],
+            "valuenum": [1.2, 3.4],
+            "charttime": [T0 + pd.Timedelta(hours=1), T0 + pd.Timedelta(days=10)],
+        }
+    )
+    stays = pd.DataFrame(
+        {
+            "subject_id": [1],
+            "hadm_id": [100],
+            "stay_id": [10],
+            "intime": [T0],
+            "outtime": [T0 + pd.Timedelta(days=2)],
+        }
+    )
+    labs = build_mimic_labs(
+        outputevents, labevents, stays, urine_itemids=[226559], creatinine_itemids=[50912]
+    )
+    assert list(labs.columns) == ["stay_id", "itemid", "valuenum"]
+    urine = labs[labs["itemid"] == 226559]
+    assert len(urine) == 1 and urine.iloc[0]["valuenum"] == 800.0
+    cr = labs[labs["itemid"] == 50912]
+    assert len(cr) == 1 and cr.iloc[0]["valuenum"] == 1.2
+    assert cr.iloc[0]["stay_id"] == 10
 
 
 def test_flags_stub_raises():

@@ -64,9 +64,51 @@ def build_mimic_crrt_events(
     return pd.DataFrame(rows, columns=_EVENTS_COLS)
 
 
-def build_mimic_labs(*args: object, **kwargs: object) -> pd.DataFrame:
-    """Stub — implemented in Task 2."""
-    raise NotImplementedError("build_mimic_labs is implemented in Task 2")
+def build_mimic_labs(
+    outputevents: pd.DataFrame,
+    labevents: pd.DataFrame,
+    stays: pd.DataFrame,
+    urine_itemids: Sequence[int],
+    creatinine_itemids: Sequence[int],
+) -> pd.DataFrame:
+    """Canonical labs: urine (outputevents -> 226559) + creatinine (labevents -> 50912).
+
+    Args:
+        outputevents: MIMIC-IV outputevents table with columns ``stay_id``, ``itemid``,
+            ``value`` (urine output in mL).
+        labevents: MIMIC-IV labevents table with columns ``subject_id``, ``itemid``,
+            ``valuenum``, ``charttime``.
+        stays: ICU stays table with columns ``subject_id``, ``hadm_id``, ``stay_id``,
+            ``intime``, ``outtime``.
+        urine_itemids: outputevents item IDs for urine output (e.g. [226559]).
+        creatinine_itemids: labevents item IDs for serum creatinine (e.g. [50912]).
+
+    Returns:
+        DataFrame with columns ``stay_id``, ``itemid``, ``valuenum``.
+        Urine rows use canonical itemid ``_URINE_CANONICAL``; creatinine rows use
+        ``_CREATININE_CANONICAL`` and are restricted to the ICU stay window.
+    """
+    cols = ["stay_id", "itemid", "valuenum"]
+
+    uo = outputevents[outputevents["itemid"].isin(list(urine_itemids))][["stay_id", "value"]].copy()
+    uo = uo.rename(columns={"value": "valuenum"})
+    uo["itemid"] = _URINE_CANONICAL
+    uo["valuenum"] = uo["valuenum"].astype(float)
+
+    cr = labevents[labevents["itemid"].isin(list(creatinine_itemids))].copy()
+    cr["charttime"] = pd.to_datetime(cr["charttime"])
+    st = stays[["subject_id", "stay_id", "intime", "outtime"]].copy()
+    st["intime"] = pd.to_datetime(st["intime"])
+    st["outtime"] = pd.to_datetime(st["outtime"])
+    merged = cr.merge(st, on="subject_id", how="inner")
+    in_stay = merged[
+        (merged["charttime"] >= merged["intime"]) & (merged["charttime"] <= merged["outtime"])
+    ]
+    cr_out = in_stay[["stay_id"]].copy()
+    cr_out["itemid"] = _CREATININE_CANONICAL
+    cr_out["valuenum"] = in_stay["valuenum"].astype(float).to_numpy()
+
+    return pd.concat([uo[cols], cr_out[cols]], ignore_index=True)
 
 
 def build_mimic_flags(*args: object, **kwargs: object) -> pd.DataFrame:
