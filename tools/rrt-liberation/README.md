@@ -34,6 +34,10 @@ definition sensitivity (72h/7d/14d), decision curve analysis, **external benchma
 comparison** (dev vs urine-only vs UNDERSCORE with external DCA), discrimination +
 calibration, TRIPOD flow + Table 1.
 
+Extract real MIMIC-IV (local, credentialed): `uv run python -m pipeline.extract_mimic`
+-> writes `data/mimic/{crrt_events,labs,flags}.csv` from raw module tables (configure
+paths/itemids in `conf/extract_mimic.yaml`; verify itemids against your MIMIC version).
+
 Run the dev model: `uv run python -m pipeline.run model=logistic`
 Run external validation: `uv run python -m pipeline.validate fixed_model_path=outputs/model_logistic.json cohort=eicu`
 Run definition sensitivity: `uv run python -m pipeline.sensitivity cohort=mimic`
