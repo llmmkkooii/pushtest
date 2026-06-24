@@ -1,4 +1,3 @@
-import numpy as np  # noqa: F401  (kept for parity; remove if ruff flags unused)
 import pandas as pd
 
 from pipeline.run import run_pipeline

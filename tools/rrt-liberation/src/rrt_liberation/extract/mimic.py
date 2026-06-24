@@ -73,6 +73,9 @@ def build_mimic_labs(
 ) -> pd.DataFrame:
     """Canonical labs: urine (outputevents -> 226559) + creatinine (labevents -> 50912).
 
+    Assumes non-overlapping icustays windows per subject (true in MIMIC-IV); a
+    creatinine charttime is assigned to the one stay whose [intime, outtime] contains it.
+
     Args:
         outputevents: MIMIC-IV outputevents table with columns ``stay_id``, ``itemid``,
             ``value`` (urine output in mL).
