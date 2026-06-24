@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import List, Sequence
+from collections.abc import Sequence
 
 import pandas as pd
 
@@ -19,15 +19,28 @@ def build_mimic_crrt_events(
     crrt_itemids: Sequence[int],
     merge_gap_hours: float = 6.0,
 ) -> pd.DataFrame:
-    """CRRT on-intervals per stay, merging fragments within merge_gap_hours."""
+    """Return CRRT on-intervals per ICU stay, merging fragments within merge_gap_hours.
+
+    Args:
+        procedureevents: MIMIC-IV procedureevents table with columns
+            ``subject_id``, ``stay_id``, ``itemid``, ``starttime``, ``endtime``.
+        crrt_itemids: Item IDs that indicate active CRRT (e.g. 225802).
+        merge_gap_hours: Two consecutive rows whose gap (next starttime minus
+            current endtime) is <= this value are merged into one interval.
+
+    Returns:
+        DataFrame with columns ``subject_id``, ``stay_id``, ``starttime``,
+        ``endtime``, ``modality`` (always "CRRT"), one row per merged episode.
+    """
     crrt = procedureevents[procedureevents["itemid"].isin(list(crrt_itemids))].copy()
     if crrt.empty:
+        logger.debug("No rows matched crrt_itemids; returning empty events frame.")
         return pd.DataFrame(columns=_EVENTS_COLS)
     crrt["starttime"] = pd.to_datetime(crrt["starttime"])
     crrt["endtime"] = pd.to_datetime(crrt["endtime"])
     gap = pd.Timedelta(hours=merge_gap_hours)
 
-    rows: List[dict] = []
+    rows: list[dict] = []
     for stay_id, grp in crrt.sort_values("starttime").groupby("stay_id"):
         subject_id = grp["subject_id"].iloc[0]
         cur_start = cur_end = None
@@ -47,12 +60,15 @@ def build_mimic_crrt_events(
             {"subject_id": subject_id, "stay_id": stay_id,
              "starttime": cur_start, "endtime": cur_end, "modality": "CRRT"}
         )
+    logger.debug("Built %d CRRT episodes from %d rows.", len(rows), len(crrt))
     return pd.DataFrame(rows, columns=_EVENTS_COLS)
 
 
 def build_mimic_labs(*args: object, **kwargs: object) -> pd.DataFrame:
+    """Stub — implemented in Task 2."""
     raise NotImplementedError("build_mimic_labs is implemented in Task 2")
 
 
 def build_mimic_flags(*args: object, **kwargs: object) -> pd.DataFrame:
-    raise NotImplementedError("build_mimic_flags is implemented in Task 2")
+    """Stub — implemented in Task 3."""
+    raise NotImplementedError("build_mimic_flags is implemented in Task 3")
