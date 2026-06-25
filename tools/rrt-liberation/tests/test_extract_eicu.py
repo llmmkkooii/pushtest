@@ -2,6 +2,55 @@ import pandas as pd
 
 from rrt_liberation.extract import build_eicu_crrt_events, build_eicu_labs
 from rrt_liberation.extract import build_eicu_flags
+from rrt_liberation.cohort import CohortFactory
+from rrt_liberation.features import build_features
+
+SIX = [
+    "urine_output_24h", "baseline_creatinine", "crrt_duration_hours",
+    "sepsis_shock", "vasopressor", "mechanical_ventilation",
+]
+
+
+def _synthetic_eicu_raw(n_stays=8):
+    treat, lab, io, dx, inf, resp, pat = [], [], [], [], [], [], []
+    for i in range(n_stays):
+        pid = 5000 + i
+        pat.append({"patientunitstayid": pid})
+        treat.append({"patientunitstayid": pid, "treatmentstring": "renal|CVVHDF",
+                      "treatmentoffset": 0, "treatmentstopoffset": 1440})
+        if i % 2 == 0:
+            r0 = (24 + 72) * 60
+            treat.append({"patientunitstayid": pid, "treatmentstring": "renal|CVVHDF",
+                          "treatmentoffset": r0, "treatmentstopoffset": r0 + 1440})
+        lab.append({"patientunitstayid": pid, "labname": "creatinine", "labresult": float(1.0 + 0.1 * i)})
+        io.append({"patientunitstayid": pid, "celllabel": "Urine", "cellvaluenumeric": float(400 + 40 * i)})
+        if i % 3 == 0:
+            dx.append({"patientunitstayid": pid, "diagnosisstring": "septic shock"})
+        if i % 2 == 0:
+            inf.append({"patientunitstayid": pid, "drugname": "Norepinephrine"})
+        if i % 2 == 1:
+            resp.append({"patientunitstayid": pid})
+    return (
+        pd.DataFrame(treat), pd.DataFrame(lab), pd.DataFrame(io), pd.DataFrame(dx),
+        pd.DataFrame(inf), pd.DataFrame(resp), pd.DataFrame(pat),
+    )
+
+
+def test_extract_then_build_features(tmp_path):
+    treat, lab, io, dx, inf, resp, pat = _synthetic_eicu_raw()
+    events = build_eicu_crrt_events(treat, ["cvvhdf"], 360.0)
+    labs = build_eicu_labs(lab, io, ["creatinine"], ["urine"])
+    flags = build_eicu_flags(
+        pat, dx, inf, resp, ["septic shock"], ["norepinephrine"], ["ventilator"]
+    )
+
+    builder = CohortFactory("eicu")(min_off_hours=24.0)
+    cohort = builder.build(events=events, horizon_hours=7 * 24)
+    sources = {"labs": labs, "events": builder.to_canonical_events(events), "flags": flags}
+    feats = build_features(cohort, sources, SIX)
+    for col in SIX:
+        assert col in feats.columns
+    assert len(feats) == len(cohort) and len(cohort) > 0
 
 
 def _treatment(rows):
