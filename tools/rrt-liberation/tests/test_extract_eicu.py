@@ -1,6 +1,6 @@
 import pandas as pd
 
-from rrt_liberation.extract import build_eicu_crrt_events
+from rrt_liberation.extract import build_eicu_crrt_events, build_eicu_labs
 
 
 def _treatment(rows):
@@ -43,3 +43,22 @@ def test_separate_stays_not_merged():
     ev = build_eicu_crrt_events(t, crrt_terms=["cvvh"], merge_gap_minutes=360.0)
     assert set(ev["patientunitstayid"]) == {1, 2}
     assert len(ev) == 2
+
+
+def test_labs_creatinine_and_urine_canonical():
+    lab = pd.DataFrame(
+        {"patientunitstayid": [10, 10], "labname": ["creatinine", "sodium"],
+         "labresult": [1.5, 140.0]}
+    )
+    intakeoutput = pd.DataFrame(
+        {"patientunitstayid": [10, 10], "celllabel": ["Urine (mL)", "Stool"],
+         "cellvaluenumeric": [750.0, 200.0]}
+    )
+    labs = build_eicu_labs(
+        lab, intakeoutput, creatinine_terms=["creatinine"], urine_terms=["urine"]
+    )
+    assert list(labs.columns) == ["stay_id", "itemid", "valuenum"]
+    cr = labs[labs["itemid"] == 50912]
+    assert len(cr) == 1 and cr.iloc[0]["valuenum"] == 1.5 and cr.iloc[0]["stay_id"] == 10
+    uo = labs[labs["itemid"] == 226559]
+    assert len(uo) == 1 and uo.iloc[0]["valuenum"] == 750.0

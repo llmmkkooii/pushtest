@@ -57,8 +57,28 @@ def build_eicu_crrt_events(
     return pd.DataFrame(rows, columns=_EICU_EVENTS_COLS)
 
 
-def build_eicu_labs(*args: object, **kwargs: object) -> pd.DataFrame:
-    raise NotImplementedError("build_eicu_labs is implemented in Task 2")
+def build_eicu_labs(
+    lab: pd.DataFrame,
+    intakeoutput: pd.DataFrame,
+    creatinine_terms: Sequence[str],
+    urine_terms: Sequence[str],
+) -> pd.DataFrame:
+    """Canonical labs: creatinine (lab.labname -> 50912) + urine (intakeoutput -> 226559)."""
+    cr = lab[_contains_any(lab["labname"], creatinine_terms)][
+        ["patientunitstayid", "labresult"]
+    ].copy()
+    cr = cr.rename(columns={"patientunitstayid": "stay_id", "labresult": "valuenum"})
+    cr["itemid"] = _CREATININE_CANONICAL
+    cr["valuenum"] = cr["valuenum"].astype(float)
+
+    uo = intakeoutput[_contains_any(intakeoutput["celllabel"], urine_terms)][
+        ["patientunitstayid", "cellvaluenumeric"]
+    ].copy()
+    uo = uo.rename(columns={"patientunitstayid": "stay_id", "cellvaluenumeric": "valuenum"})
+    uo["itemid"] = _URINE_CANONICAL
+    uo["valuenum"] = uo["valuenum"].astype(float)
+
+    return pd.concat([cr[_LABS_COLS], uo[_LABS_COLS]], ignore_index=True)
 
 
 def build_eicu_flags(*args: object, **kwargs: object) -> pd.DataFrame:
