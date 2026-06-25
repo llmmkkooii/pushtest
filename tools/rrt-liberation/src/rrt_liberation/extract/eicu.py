@@ -27,7 +27,13 @@ def build_eicu_crrt_events(
     crrt_terms: Sequence[str],
     merge_gap_minutes: float = 360.0,
 ) -> pd.DataFrame:
-    """CRRT on-intervals (eICU minute-offset form) per stay, merging within the gap."""
+    """CRRT on-intervals (eICU minute-offset form) per stay, merging within the gap.
+
+    Rows with a null ``treatmentstopoffset`` propagate NaN to the output (and a NaT
+    endtime downstream), so they are excluded from liberation-attempt detection.
+    Real eICU treatment often lacks an explicit stop offset — derive/impute it
+    upstream before extraction if such episodes must be retained.
+    """
     crrt = treatment[_contains_any(treatment["treatmentstring"], crrt_terms)].copy()
     if crrt.empty:
         return pd.DataFrame(columns=_EICU_EVENTS_COLS)
