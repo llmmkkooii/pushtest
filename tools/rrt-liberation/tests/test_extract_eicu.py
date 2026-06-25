@@ -1,0 +1,136 @@
+import pandas as pd
+
+from rrt_liberation.extract import build_eicu_crrt_events, build_eicu_labs
+from rrt_liberation.extract import build_eicu_flags
+from rrt_liberation.cohort import CohortFactory
+from rrt_liberation.features import build_features
+
+SIX = [
+    "urine_output_24h", "baseline_creatinine", "crrt_duration_hours",
+    "sepsis_shock", "vasopressor", "mechanical_ventilation",
+]
+
+
+def _synthetic_eicu_raw(n_stays=8):
+    treat, lab, io, dx, inf, resp, pat = [], [], [], [], [], [], []
+    for i in range(n_stays):
+        pid = 5000 + i
+        pat.append({"patientunitstayid": pid})
+        treat.append({"patientunitstayid": pid, "treatmentstring": "renal|CVVHDF",
+                      "treatmentoffset": 0, "treatmentstopoffset": 1440})
+        if i % 2 == 0:
+            r0 = (24 + 72) * 60
+            treat.append({"patientunitstayid": pid, "treatmentstring": "renal|CVVHDF",
+                          "treatmentoffset": r0, "treatmentstopoffset": r0 + 1440})
+        lab.append({"patientunitstayid": pid, "labname": "creatinine", "labresult": float(1.0 + 0.1 * i)})
+        io.append({"patientunitstayid": pid, "celllabel": "Urine", "cellvaluenumeric": float(400 + 40 * i)})
+        if i % 3 == 0:
+            dx.append({"patientunitstayid": pid, "diagnosisstring": "septic shock"})
+        if i % 2 == 0:
+            inf.append({"patientunitstayid": pid, "drugname": "Norepinephrine"})
+        if i % 2 == 1:
+            resp.append({"patientunitstayid": pid})
+    return (
+        pd.DataFrame(treat), pd.DataFrame(lab), pd.DataFrame(io), pd.DataFrame(dx),
+        pd.DataFrame(inf), pd.DataFrame(resp), pd.DataFrame(pat),
+    )
+
+
+def test_extract_then_build_features(tmp_path):
+    treat, lab, io, dx, inf, resp, pat = _synthetic_eicu_raw()
+    events = build_eicu_crrt_events(treat, ["cvvhdf"], 360.0)
+    labs = build_eicu_labs(lab, io, ["creatinine"], ["urine"])
+    flags = build_eicu_flags(
+        pat, dx, inf, resp, ["septic shock"], ["norepinephrine"], ["ventilator"]
+    )
+
+    builder = CohortFactory("eicu")(min_off_hours=24.0)
+    cohort = builder.build(events=events, horizon_hours=7 * 24)
+    sources = {"labs": labs, "events": builder.to_canonical_events(events), "flags": flags}
+    feats = build_features(cohort, sources, SIX)
+    for col in SIX:
+        assert col in feats.columns
+    assert len(feats) == len(cohort) and len(cohort) > 0
+
+
+def _treatment(rows):
+    # rows: (patientunitstayid, treatmentstring, start_min, stop_min)
+    return pd.DataFrame(
+        [
+            {"patientunitstayid": p, "treatmentstring": s,
+             "treatmentoffset": a, "treatmentstopoffset": b}
+            for (p, s, a, b) in rows
+        ]
+    )
+
+
+def test_filters_crrt_by_term_lowercase():
+    t = _treatment([(1, "Renal|Dialysis|CVVHDF", 0, 1440), (1, "antibiotics", 0, 60)])
+    ev = build_eicu_crrt_events(t, crrt_terms=["cvvhdf"], merge_gap_minutes=360.0)
+    assert list(ev.columns) == [
+        "patientunitstayid", "treatmentoffset", "treatmentstopoffset", "treatmentstring"
+    ]
+    assert len(ev) == 1
+    assert ev.iloc[0]["treatmentstring"] == "CRRT"
+
+
+def test_merges_within_gap_minutes():
+    t = _treatment([(1, "CVVH", 0, 120), (1, "CVVH", 240, 360)])
+    ev = build_eicu_crrt_events(t, crrt_terms=["cvvh"], merge_gap_minutes=360.0)
+    assert len(ev) == 1
+    assert ev.iloc[0]["treatmentoffset"] == 0
+    assert ev.iloc[0]["treatmentstopoffset"] == 360
+
+
+def test_splits_beyond_gap_minutes():
+    t = _treatment([(1, "CVVH", 0, 120), (1, "CVVH", 240, 360)])
+    ev = build_eicu_crrt_events(t, crrt_terms=["cvvh"], merge_gap_minutes=60.0)
+    assert len(ev) == 2
+
+
+def test_separate_stays_not_merged():
+    t = _treatment([(1, "CVVH", 0, 120), (2, "CVVH", 60, 180)])
+    ev = build_eicu_crrt_events(t, crrt_terms=["cvvh"], merge_gap_minutes=360.0)
+    assert set(ev["patientunitstayid"]) == {1, 2}
+    assert len(ev) == 2
+
+
+def test_labs_creatinine_and_urine_canonical():
+    lab = pd.DataFrame(
+        {"patientunitstayid": [10, 10], "labname": ["creatinine", "sodium"],
+         "labresult": [1.5, 140.0]}
+    )
+    intakeoutput = pd.DataFrame(
+        {"patientunitstayid": [10, 10], "celllabel": ["Urine (mL)", "Stool"],
+         "cellvaluenumeric": [750.0, 200.0]}
+    )
+    labs = build_eicu_labs(
+        lab, intakeoutput, creatinine_terms=["creatinine"], urine_terms=["urine"]
+    )
+    assert list(labs.columns) == ["stay_id", "itemid", "valuenum"]
+    cr = labs[labs["itemid"] == 50912]
+    assert len(cr) == 1 and cr.iloc[0]["valuenum"] == 1.5 and cr.iloc[0]["stay_id"] == 10
+    uo = labs[labs["itemid"] == 226559]
+    assert len(uo) == 1 and uo.iloc[0]["valuenum"] == 750.0
+
+
+def test_flags_derivation():
+    stays = pd.DataFrame({"patientunitstayid": [10, 20]})
+    diagnosis = pd.DataFrame(
+        {"patientunitstayid": [10], "diagnosisstring": ["sepsis|septic shock"]}
+    )
+    infusiondrug = pd.DataFrame({"patientunitstayid": [20], "drugname": ["Norepinephrine 4 mg"]})
+    respiratorycare = pd.DataFrame({"patientunitstayid": [10]})
+    flags = build_eicu_flags(
+        stays, diagnosis, infusiondrug, respiratorycare,
+        septic_shock_terms=["septic shock"], vasopressor_terms=["norepinephrine"],
+        vent_terms=["ventilator"],
+    )
+    assert list(flags.columns) == [
+        "stay_id", "sepsis_shock", "vasopressor", "mechanical_ventilation"
+    ]
+    by = flags.set_index("stay_id")
+    assert by.loc[10, "sepsis_shock"] == 1 and by.loc[20, "sepsis_shock"] == 0
+    assert by.loc[20, "vasopressor"] == 1 and by.loc[10, "vasopressor"] == 0
+    assert by.loc[10, "mechanical_ventilation"] == 1 and by.loc[20, "mechanical_ventilation"] == 0
+    assert len(flags) == 2

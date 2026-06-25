@@ -1,0 +1,19 @@
+raw:
+  treatment: ${paths.data_dir}/eicu_raw/treatment.csv
+  lab: ${paths.data_dir}/eicu_raw/lab.csv
+  intakeoutput: ${paths.data_dir}/eicu_raw/intakeOutput.csv
+  diagnosis: ${paths.data_dir}/eicu_raw/diagnosis.csv
+  infusiondrug: ${paths.data_dir}/eicu_raw/infusionDrug.csv
+  respiratorycare: ${paths.data_dir}/eicu_raw/respiratoryCare.csv
+  patient: ${paths.data_dir}/eicu_raw/patient.csv
+terms:
+  crrt: ["cvvh", "cvvhd", "cvvhdf", "crrt", "continuous renal replacement", "scuf"]
+  creatinine: ["creatinine"]
+  urine: ["urine", "foley", "void"]
+  septic_shock: ["septic shock"]
+  vasopressor: ["norepinephrine", "epinephrine", "vasopressin", "dopamine", "phenylephrine"]
+  ventilation: ["ventilator", "mechanical vent", "intubat"]
+merge_gap_minutes: 360.0
+paths:
+  data_dir: data
+  output_dir: ${paths.data_dir}/eicu
