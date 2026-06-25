@@ -1,6 +1,7 @@
 import pandas as pd
 
 from rrt_liberation.extract import build_eicu_crrt_events, build_eicu_labs
+from rrt_liberation.extract import build_eicu_flags
 
 
 def _treatment(rows):
@@ -62,3 +63,25 @@ def test_labs_creatinine_and_urine_canonical():
     assert len(cr) == 1 and cr.iloc[0]["valuenum"] == 1.5 and cr.iloc[0]["stay_id"] == 10
     uo = labs[labs["itemid"] == 226559]
     assert len(uo) == 1 and uo.iloc[0]["valuenum"] == 750.0
+
+
+def test_flags_derivation():
+    stays = pd.DataFrame({"patientunitstayid": [10, 20]})
+    diagnosis = pd.DataFrame(
+        {"patientunitstayid": [10], "diagnosisstring": ["sepsis|septic shock"]}
+    )
+    infusiondrug = pd.DataFrame({"patientunitstayid": [20], "drugname": ["Norepinephrine 4 mg"]})
+    respiratorycare = pd.DataFrame({"patientunitstayid": [10]})
+    flags = build_eicu_flags(
+        stays, diagnosis, infusiondrug, respiratorycare,
+        septic_shock_terms=["septic shock"], vasopressor_terms=["norepinephrine"],
+        vent_terms=["ventilator"],
+    )
+    assert list(flags.columns) == [
+        "stay_id", "sepsis_shock", "vasopressor", "mechanical_ventilation"
+    ]
+    by = flags.set_index("stay_id")
+    assert by.loc[10, "sepsis_shock"] == 1 and by.loc[20, "sepsis_shock"] == 0
+    assert by.loc[20, "vasopressor"] == 1 and by.loc[10, "vasopressor"] == 0
+    assert by.loc[10, "mechanical_ventilation"] == 1 and by.loc[20, "mechanical_ventilation"] == 0
+    assert len(flags) == 2

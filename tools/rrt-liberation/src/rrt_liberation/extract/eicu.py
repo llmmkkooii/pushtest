@@ -81,5 +81,37 @@ def build_eicu_labs(
     return pd.concat([cr[_LABS_COLS], uo[_LABS_COLS]], ignore_index=True)
 
 
-def build_eicu_flags(*args: object, **kwargs: object) -> pd.DataFrame:
-    raise NotImplementedError("build_eicu_flags is implemented in Task 3")
+def build_eicu_flags(
+    stays: pd.DataFrame,
+    diagnosis: pd.DataFrame,
+    infusiondrug: pd.DataFrame,
+    respiratorycare: pd.DataFrame,
+    septic_shock_terms: Sequence[str],
+    vasopressor_terms: Sequence[str],
+    vent_terms: Sequence[str],
+) -> pd.DataFrame:
+    """Per-stay binary flags from eICU string tables.
+
+    Ventilation is flagged by presence of a respiratorycare row for the stay;
+    `vent_terms` is reserved for a future string-column filter.
+    """
+    out = pd.DataFrame({"stay_id": stays["patientunitstayid"].drop_duplicates().to_numpy()})
+
+    shock_stays = set(
+        diagnosis[_contains_any(diagnosis["diagnosisstring"], septic_shock_terms)][
+            "patientunitstayid"
+        ]
+    )
+    out["sepsis_shock"] = out["stay_id"].isin(shock_stays).astype(int)
+
+    vaso_stays = set(
+        infusiondrug[_contains_any(infusiondrug["drugname"], vasopressor_terms)][
+            "patientunitstayid"
+        ]
+    )
+    out["vasopressor"] = out["stay_id"].isin(vaso_stays).astype(int)
+
+    vent_stays = set(respiratorycare["patientunitstayid"]) if not respiratorycare.empty else set()
+    out["mechanical_ventilation"] = out["stay_id"].isin(vent_stays).astype(int)
+
+    return out[["stay_id", "sepsis_shock", "vasopressor", "mechanical_ventilation"]]
