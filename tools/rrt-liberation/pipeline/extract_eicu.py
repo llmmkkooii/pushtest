@@ -13,6 +13,7 @@ from rrt_liberation.extract import (
     build_eicu_flags,
     build_eicu_labs,
     build_eicu_rrt_events,
+    build_eicu_stays,
 )
 from rrt_liberation.utils import write_csv
 
@@ -48,6 +49,7 @@ def main(cfg: DictConfig) -> None:
         ),
         out / "flags.csv",
     )
+    write_csv(build_eicu_stays(patient), out / "stays.csv")
     logger.info("Wrote canonical eICU CSVs to %s", out)
 
 
