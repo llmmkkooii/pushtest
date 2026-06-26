@@ -207,3 +207,24 @@ def build_mimic_flags(
         out["mechanical_ventilation"].sum(),
     )
     return out[["stay_id", "sepsis_shock", "vasopressor", "mechanical_ventilation"]]
+
+
+def build_mimic_stays(icustays: pd.DataFrame, admissions: pd.DataFrame) -> pd.DataFrame:
+    """Per-stay hospital discharge time + in-hospital death (input for label_recovery).
+
+    Args:
+        icustays: MIMIC-IV icustays with ``stay_id`` and ``hadm_id``.
+        admissions: MIMIC-IV admissions with ``hadm_id``, ``dischtime`` (hospital
+            discharge), and ``hospital_expire_flag`` (1 if the patient died in hospital).
+
+    Returns:
+        DataFrame with ``stay_id``, ``discharge_time`` (datetime), ``died`` (0/1).
+    """
+    st = icustays[["stay_id", "hadm_id"]].drop_duplicates()
+    adm = admissions[["hadm_id", "dischtime", "hospital_expire_flag"]]
+    m = st.merge(adm, on="hadm_id", how="left")
+    out = pd.DataFrame()
+    out["stay_id"] = m["stay_id"].to_numpy()
+    out["discharge_time"] = pd.to_datetime(m["dischtime"]).to_numpy()
+    out["died"] = m["hospital_expire_flag"].fillna(0).astype(int).to_numpy()
+    return out[["stay_id", "discharge_time", "died"]]

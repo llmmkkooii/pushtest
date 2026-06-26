@@ -170,3 +170,26 @@ def build_eicu_flags(
     out["mechanical_ventilation"] = out["stay_id"].isin(vent_stays).astype(int)
 
     return out[["stay_id", "sepsis_shock", "vasopressor", "mechanical_ventilation"]]
+
+
+# Must match cohort/eicu.py so discharge times share the canonical event time origin.
+_EICU_STAYS_T0 = pd.Timestamp("2200-01-01")
+
+
+def build_eicu_stays(patient: pd.DataFrame) -> pd.DataFrame:
+    """Per-stay hospital discharge time + death from the eICU patient table.
+
+    ``hospitaldischargeoffset`` (minutes from unit admission) is converted to a timestamp
+    on the same origin as the canonical eICU events; ``hospitaldischargestatus``
+    "Expired" marks in-hospital death. Output feeds label_recovery.
+    """
+    out = pd.DataFrame()
+    out["stay_id"] = patient["patientunitstayid"].to_numpy()
+    out["discharge_time"] = (
+        _EICU_STAYS_T0
+        + pd.to_timedelta(patient["hospitaldischargeoffset"].astype(float), unit="m")
+    ).to_numpy()
+    out["died"] = (
+        patient["hospitaldischargestatus"].astype(str).str.lower() == "expired"
+    ).astype(int).to_numpy()
+    return out[["stay_id", "discharge_time", "died"]]
