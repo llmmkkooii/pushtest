@@ -1,6 +1,10 @@
 import pandas as pd
 
-from rrt_liberation.extract import build_eicu_crrt_events, build_eicu_labs
+from rrt_liberation.extract import (
+    build_eicu_crrt_events,
+    build_eicu_labs,
+    build_eicu_rrt_events,
+)
 from rrt_liberation.extract import build_eicu_flags
 from rrt_liberation.cohort import CohortFactory
 from rrt_liberation.features import build_features
@@ -93,6 +97,45 @@ def test_separate_stays_not_merged():
     ev = build_eicu_crrt_events(t, crrt_terms=["cvvh"], merge_gap_minutes=360.0)
     assert set(ev["patientunitstayid"]) == {1, 2}
     assert len(ev) == 2
+
+
+_CRRT = ["cvvh", "cvvhdf", "crrt", "continuous"]
+_IHD = ["hemodialysis", "ihd", "sled"]
+
+
+def test_rrt_events_captures_both_modalities_with_labels():
+    # One CRRT episode (two fragments, merged) + two IHD sessions (kept separate).
+    t = _treatment([
+        (1, "renal|C V V H D", 0, 120), (1, "renal|C V V H D", 240, 360),
+        (1, "renal|hemodialysis", 5000, 5240), (1, "renal|hemodialysis", 8000, 8240),
+    ])
+    ev = build_eicu_rrt_events(t, crrt_terms=_CRRT, ihd_terms=_IHD, merge_gap_minutes=360.0)
+    assert list(ev.columns) == [
+        "patientunitstayid", "treatmentoffset", "treatmentstopoffset", "treatmentstring"
+    ]
+    crrt = ev[ev["treatmentstring"] == "CRRT"]
+    ihd = ev[ev["treatmentstring"] == "IHD"]
+    assert len(crrt) == 1            # two fragments merged into one episode
+    assert crrt.iloc[0]["treatmentoffset"] == 0 and crrt.iloc[0]["treatmentstopoffset"] == 360
+    assert len(ihd) == 2             # IHD sessions NOT merged across routine gaps
+
+
+def test_rrt_crrt_precedence_when_string_matches_both():
+    # "continuous venovenous hemodialysis" matches both term sets -> classified CRRT.
+    t = _treatment([(1, "continuous venovenous hemodialysis", 0, 1440)])
+    ev = build_eicu_rrt_events(t, crrt_terms=_CRRT, ihd_terms=_IHD, merge_gap_minutes=360.0)
+    assert len(ev) == 1
+    assert ev.iloc[0]["treatmentstring"] == "CRRT"
+
+
+def test_rrt_events_end_to_end_ihd_grouped_by_72h():
+    # Alternate-day IHD via the RRT extractor -> cohort with the 72h map -> one attempt.
+    t = _treatment([(1, "renal|hemodialysis", h * 60, (h + 4) * 60) for h in (0, 48, 96)])
+    ev = build_eicu_rrt_events(t, crrt_terms=_CRRT, ihd_terms=_IHD, merge_gap_minutes=360.0)
+    builder = CohortFactory("eicu")(min_off_hours_by_class={"CRRT": 24.0, "IHD": 72.0})
+    cohort = builder.build(events=ev, horizon_hours=7 * 24)
+    assert len(cohort) == 1
+    assert (cohort["modality_class"] == "IHD").all()
 
 
 def test_labs_creatinine_and_urine_canonical():

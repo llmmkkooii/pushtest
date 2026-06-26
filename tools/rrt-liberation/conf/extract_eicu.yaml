@@ -7,7 +7,10 @@ raw:
   respiratorycare: ${paths.data_dir}/eicu_raw/respiratoryCare.csv
   patient: ${paths.data_dir}/eicu_raw/patient.csv
 terms:
+  # CRRT takes precedence over IHD for ambiguous strings (e.g. "continuous venovenous
+  # hemodialysis"). Term lists are DEFAULTS — confirm against the real eICU vocabulary.
   crrt: ["cvvh", "cvvhd", "cvvhdf", "crrt", "continuous renal replacement", "scuf"]
+  ihd: ["hemodialysis", "ihd", "sled", "sustained low efficiency"]  # 要確認
   creatinine: ["creatinine"]
   urine: ["urine", "foley", "void"]
   septic_shock: ["septic shock"]
