@@ -114,6 +114,28 @@ def label_recovery(
     return out
 
 
+def build_recovery_cohort(
+    stays: pd.DataFrame, events: pd.DataFrame, recovery_window_hours: float = 336.0
+) -> pd.DataFrame:
+    """Per-stay recovery cohort: ``recovered`` label + ``modality_class`` per RRT stay.
+
+    Restricted to stays that actually received RRT (present in ``events``). A stay's
+    modality is "CRRT" if it had any CRRT episode, else "IHD" (CRRT precedence), so the
+    recovery outcome can be analysed by modality (RQ2). Returns columns ``stay_id``,
+    ``recovered``, ``modality_class``.
+    """
+    rec = label_recovery(stays, events, recovery_window_hours=recovery_window_hours)
+    ev = events.copy()
+    ev["_mc"] = [classify_modality(m) for m in ev.get("modality", [None] * len(ev))]
+    stay_mod = ev.groupby("stay_id")["_mc"].apply(
+        lambda s: "CRRT" if (s == "CRRT").any() else "IHD"
+    )
+    out = rec.merge(
+        stay_mod.rename("modality_class"), on="stay_id", how="inner"
+    )
+    return out[["stay_id", "recovered", "modality_class"]]
+
+
 def label_outcome(
     attempts: pd.DataFrame, events: pd.DataFrame, horizon_hours: float
 ) -> pd.DataFrame:
