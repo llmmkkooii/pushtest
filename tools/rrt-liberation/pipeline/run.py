@@ -30,7 +30,13 @@ from rrt_liberation.model.base import BaseModel
 from rrt_liberation.model.logistic import LogisticModel
 from rrt_liberation.model.persistence import save_model_json
 from rrt_liberation.reporting import build_coefficient_table, build_table1, write_flow
-from rrt_liberation.utils import read_csv, set_seed, write_csv, write_json
+from rrt_liberation.utils import (
+    class_map_from_cfg,
+    read_csv,
+    set_seed,
+    write_csv,
+    write_json,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +56,7 @@ def run_pipeline(
     n_boot: int = 200,
     created_utc: Optional[str] = None,
     flags_csv: Optional[str | Path] = None,
+    min_off_hours_by_class: Optional[Dict[str, float]] = None,
 ) -> Dict[str, float]:
     """Run the vertical slice and return key metrics."""
     set_seed(seed)
@@ -62,7 +69,9 @@ def run_pipeline(
     labs = read_csv(labs_csv)
 
     horizon = get_horizon(liberation_name)
-    builder = CohortFactory(cohort_name)(min_off_hours=min_off_hours)
+    builder = CohortFactory(cohort_name)(
+        min_off_hours=min_off_hours, min_off_hours_by_class=min_off_hours_by_class
+    )
     cohort = builder.build(events=events, horizon_hours=horizon)
 
     sources: Dict[str, pd.DataFrame] = {
@@ -188,6 +197,7 @@ def main(cfg: DictConfig) -> None:
         ),
         n_boot=(cfg.model.n_boot if is_logistic else 200),
         flags_csv=cfg.cohort.get("flags_csv"),
+        min_off_hours_by_class=class_map_from_cfg(cfg.cohort),
     )
 
 

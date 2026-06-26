@@ -17,7 +17,13 @@ from rrt_liberation.evaluation.internal_validation import internal_validation
 from rrt_liberation.features import build_features
 from rrt_liberation.liberation import get_horizon
 from rrt_liberation.model.logistic import LogisticModel
-from rrt_liberation.utils import read_csv, set_seed, write_csv, write_json
+from rrt_liberation.utils import (
+    class_map_from_cfg,
+    read_csv,
+    set_seed,
+    write_csv,
+    write_json,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -34,12 +40,15 @@ def run_definition_sensitivity(
     n_boot: int = 200,
     seed: int = 42,
     flags_csv: Optional[str | Path] = None,
+    min_off_hours_by_class: Optional[Dict[str, float]] = None,
 ) -> List[Dict[str, object]]:
     """Run the dev logistic model across liberation definitions; aggregate metrics."""
     set_seed(seed)
     output_dir = Path(output_dir)
 
-    builder = CohortFactory(cohort_name)(min_off_hours=min_off_hours)
+    builder = CohortFactory(cohort_name)(
+        min_off_hours=min_off_hours, min_off_hours_by_class=min_off_hours_by_class
+    )
     events = read_csv(events_csv)
     if cohort_name == "mimic":
         for col in ("starttime", "endtime"):
@@ -126,6 +135,7 @@ def main(cfg: DictConfig) -> None:
         n_boot=cfg.n_boot,
         seed=cfg.seed,
         flags_csv=cfg.cohort.get("flags_csv"),
+        min_off_hours_by_class=class_map_from_cfg(cfg.cohort),
     )
 
 

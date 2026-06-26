@@ -17,7 +17,11 @@ class MimicCohortBuilder(BaseCohortBuilder):
 
     def build(self, events: pd.DataFrame, horizon_hours: float) -> pd.DataFrame:
         canonical = self.to_canonical_events(events)
-        attempts = find_attempts(canonical, min_off_hours=self.min_off_hours)
+        attempts = find_attempts(
+            canonical,
+            min_off_hours=self.min_off_hours,
+            min_off_hours_by_class=self.min_off_hours_by_class,
+        )
         labeled = label_outcome(attempts, canonical, horizon_hours=horizon_hours)
         logger.info("MIMIC cohort: %d attempts", len(labeled))
         return labeled

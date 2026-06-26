@@ -22,7 +22,13 @@ from rrt_liberation.features import build_features
 from rrt_liberation.liberation import get_horizon
 from rrt_liberation.model.persistence import load_model_json
 from rrt_liberation.reporting import build_table1
-from rrt_liberation.utils import read_csv, set_seed, write_csv, write_json
+from rrt_liberation.utils import (
+    class_map_from_cfg,
+    read_csv,
+    set_seed,
+    write_csv,
+    write_json,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +44,7 @@ def run_external_validation(
     n_boot: int = 200,
     seed: int = 42,
     flags_csv: Optional[str | Path] = None,
+    min_off_hours_by_class: Optional[Dict[str, float]] = None,
 ) -> Dict[str, object]:
     """Load a fixed model and validate it on an external cohort (no retraining)."""
     set_seed(seed)
@@ -45,7 +52,9 @@ def run_external_validation(
 
     model = load_model_json(fixed_model_path)
     horizon = get_horizon(liberation_name)
-    builder = CohortFactory(cohort_name)(min_off_hours=min_off_hours)
+    builder = CohortFactory(cohort_name)(
+        min_off_hours=min_off_hours, min_off_hours_by_class=min_off_hours_by_class
+    )
     events = read_csv(events_csv)
     labs = read_csv(labs_csv)
     cohort = builder.build(events=events, horizon_hours=horizon)
@@ -91,6 +100,7 @@ def main(cfg: DictConfig) -> None:
         n_boot=cfg.n_boot,
         seed=cfg.seed,
         flags_csv=cfg.cohort.get("flags_csv"),
+        min_off_hours_by_class=class_map_from_cfg(cfg.cohort),
     )
 
 
