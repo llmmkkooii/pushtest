@@ -16,9 +16,13 @@ _CREATININE_CANONICAL = 50912
 
 
 def _contains_any(series: pd.Series, terms: Sequence[str]) -> pd.Series:
-    """Boolean mask: lowercase substring match against any term."""
-    low = series.astype(str).str.lower()
-    needles = [t.lower() for t in terms]
+    """Boolean mask: lowercase, whitespace-stripped substring match against any term.
+
+    eICU treatmentstrings are sometimes letter-spaced (e.g. "C V V H D"); stripping
+    whitespace on both sides lets compact configured terms ("cvvh") still match.
+    """
+    low = series.astype(str).str.lower().str.replace(r"\s+", "", regex=True)
+    needles = ["".join(t.lower().split()) for t in terms]
     return low.apply(lambda s: any(n in s for n in needles))
 
 
@@ -42,24 +46,69 @@ def build_eicu_crrt_events(
 
     rows: List[dict] = []
     for pid, grp in crrt.sort_values("treatmentoffset").groupby("patientunitstayid"):
-        cur_start: float | None = None
-        cur_end: float = 0.0
-        for _, r in grp.iterrows():
-            s, e = float(r["treatmentoffset"]), float(r["treatmentstopoffset"])
-            if cur_start is None:
-                cur_start, cur_end = s, e
-            elif s <= cur_end + merge_gap_minutes:
-                cur_end = max(cur_end, e)
-            else:
-                rows.append(
-                    {"patientunitstayid": pid, "treatmentoffset": cur_start,
-                     "treatmentstopoffset": cur_end, "treatmentstring": "CRRT"}
-                )
-                cur_start, cur_end = s, e
-        rows.append(
-            {"patientunitstayid": pid, "treatmentoffset": cur_start,
-             "treatmentstopoffset": cur_end, "treatmentstring": "CRRT"}
-        )
+        rows.extend(_merge_group_intervals(grp, merge_gap_minutes, pid, "CRRT"))
+    return pd.DataFrame(rows, columns=_EICU_EVENTS_COLS)
+
+
+def _merge_group_intervals(
+    grp: pd.DataFrame, merge_gap_minutes: float, pid: object, label: str
+) -> List[dict]:
+    """Merge one stay's sorted on-intervals that are within ``merge_gap_minutes``.
+
+    A null stop offset yields a NaN end that never merges forward (NaN comparison),
+    so such an episode is emitted with a NaN end and dropped downstream.
+    """
+    out: List[dict] = []
+    cur_start: float | None = None
+    cur_end: float = 0.0
+    for _, r in grp.iterrows():
+        s, e = float(r["treatmentoffset"]), float(r["treatmentstopoffset"])
+        if cur_start is None:
+            cur_start, cur_end = s, e
+        elif s <= cur_end + merge_gap_minutes:
+            cur_end = max(cur_end, e)
+        else:
+            out.append({"patientunitstayid": pid, "treatmentoffset": cur_start,
+                        "treatmentstopoffset": cur_end, "treatmentstring": label})
+            cur_start, cur_end = s, e
+    out.append({"patientunitstayid": pid, "treatmentoffset": cur_start,
+                "treatmentstopoffset": cur_end, "treatmentstring": label})
+    return out
+
+
+def build_eicu_rrt_events(
+    treatment: pd.DataFrame,
+    crrt_terms: Sequence[str],
+    ihd_terms: Sequence[str],
+    merge_gap_minutes: float = 360.0,
+) -> pd.DataFrame:
+    """RRT on-intervals (eICU minute-offset form) tagged by modality.
+
+    CRRT rows (matching ``crrt_terms``) are merged within ``merge_gap_minutes`` into
+    continuous episodes labelled "CRRT". IHD rows (matching ``ihd_terms`` but not
+    ``crrt_terms`` — CRRT takes precedence for ambiguous strings like "continuous
+    venovenous hemodialysis") are emitted as individual sessions labelled "IHD", so
+    routine intermittent scheduling is preserved for the 72h attempt threshold.
+    """
+    is_crrt = _contains_any(treatment["treatmentstring"], crrt_terms)
+    is_ihd = _contains_any(treatment["treatmentstring"], ihd_terms) & ~is_crrt
+
+    rows: List[dict] = []
+    crrt = treatment[is_crrt].copy()
+    if not crrt.empty:
+        crrt["treatmentoffset"] = crrt["treatmentoffset"].astype(float)
+        crrt["treatmentstopoffset"] = crrt["treatmentstopoffset"].astype(float)
+        for pid, grp in crrt.sort_values("treatmentoffset").groupby("patientunitstayid"):
+            rows.extend(_merge_group_intervals(grp, merge_gap_minutes, pid, "CRRT"))
+
+    ihd = treatment[is_ihd].copy()
+    if not ihd.empty:
+        for _, r in ihd.sort_values("treatmentoffset").iterrows():
+            rows.append({"patientunitstayid": r["patientunitstayid"],
+                         "treatmentoffset": float(r["treatmentoffset"]),
+                         "treatmentstopoffset": float(r["treatmentstopoffset"]),
+                         "treatmentstring": "IHD"})
+
     return pd.DataFrame(rows, columns=_EICU_EVENTS_COLS)
 
 
