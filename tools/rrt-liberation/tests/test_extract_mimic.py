@@ -1,7 +1,13 @@
 import pandas as pd
 
 from pipeline.run import run_pipeline
-from rrt_liberation.extract import build_mimic_crrt_events, build_mimic_labs, build_mimic_flags
+from rrt_liberation.cohort import CohortFactory
+from rrt_liberation.extract import (
+    build_mimic_crrt_events,
+    build_mimic_flags,
+    build_mimic_labs,
+    build_mimic_rrt_events,
+)
 
 T0 = pd.Timestamp("2150-01-01")
 
@@ -57,6 +63,40 @@ def test_empty_after_filter_returns_correct_columns():
     ev = build_mimic_crrt_events(proc, crrt_itemids=[225802], merge_gap_hours=6.0)
     assert list(ev.columns) == ["subject_id", "stay_id", "starttime", "endtime", "modality"]
     assert len(ev) == 0
+
+
+def test_rrt_events_captures_both_modalities():
+    # CRRT (two fragments within 6h -> merged) + two IHD sessions (kept separate).
+    proc = _proc([
+        (1, 225802, 0, 2), (1, 225802, 4, 6),
+        (1, 225441, 100, 104), (1, 225441, 150, 154),
+    ])
+    ev = build_mimic_rrt_events(
+        proc, crrt_itemids=[225802], ihd_itemids=[225441], merge_gap_hours=6.0
+    )
+    assert list(ev.columns) == ["subject_id", "stay_id", "starttime", "endtime", "modality"]
+    assert len(ev[ev["modality"] == "CRRT"]) == 1
+    assert len(ev[ev["modality"] == "IHD"]) == 2
+
+
+def test_rrt_crrt_precedence_for_shared_itemid():
+    proc = _proc([(1, 225802, 0, 24)])
+    ev = build_mimic_rrt_events(
+        proc, crrt_itemids=[225802], ihd_itemids=[225802], merge_gap_hours=6.0
+    )
+    assert len(ev) == 1 and ev.iloc[0]["modality"] == "CRRT"
+
+
+def test_rrt_end_to_end_ihd_grouped_by_72h():
+    # Alternate-day IHD via the MIMIC extractor -> cohort with the 72h map -> one attempt.
+    proc = _proc([(1, 225441, h, h + 4) for h in (0, 48, 96)])
+    ev = build_mimic_rrt_events(
+        proc, crrt_itemids=[225802], ihd_itemids=[225441], merge_gap_hours=6.0
+    )
+    builder = CohortFactory("mimic")(min_off_hours_by_class={"CRRT": 24.0, "IHD": 72.0})
+    cohort = builder.build(events=ev, horizon_hours=7 * 24)
+    assert len(cohort) == 1
+    assert (cohort["modality_class"] == "IHD").all()
 
 
 def test_single_row_returns_one_episode():

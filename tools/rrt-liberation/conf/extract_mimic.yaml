@@ -7,7 +7,10 @@ raw:
   ventilation: ${paths.data_dir}/mimic_raw/ventilation.csv
   icustays: ${paths.data_dir}/mimic_raw/icustays.csv
 itemids:
+  # CRRT takes precedence over IHD for any shared itemid. itemid lists are DEFAULTS —
+  # confirm against d_items. 要確認.
   crrt: [225802, 225803, 225805, 225809]
+  ihd: [225441]  # 要確認: 225441 = Hemodialysis (intermittent)
   urine: [226559, 226560, 227510]
   creatinine: [50912]
   vasopressor: [221906, 221289, 222315, 221662, 221749]
