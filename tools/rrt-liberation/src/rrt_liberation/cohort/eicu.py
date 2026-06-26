@@ -8,7 +8,11 @@ import logging
 import pandas as pd
 
 from rrt_liberation.cohort.base import BaseCohortBuilder
-from rrt_liberation.liberation.rules import find_attempts, label_outcome
+from rrt_liberation.liberation.rules import (
+    classify_modality,
+    find_attempts,
+    label_outcome,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -42,5 +46,10 @@ class EicuCohortBuilder(BaseCohortBuilder):
         out["stay_id"] = events["patientunitstayid"].to_numpy()
         out["starttime"] = _EICU_T0 + pd.to_timedelta(events["treatmentoffset"], unit=_OFFSET_UNIT)
         out["endtime"] = _EICU_T0 + pd.to_timedelta(events["treatmentstopoffset"], unit=_OFFSET_UNIT)
-        out["modality"] = "CVVHDF"
+        # Derive modality (IHD vs CRRT) from the treatment string rather than assuming
+        # CRRT, so the per-modality off-threshold applies correctly downstream.
+        if "treatmentstring" in events:
+            out["modality"] = [classify_modality(s) for s in events["treatmentstring"]]
+        else:
+            out["modality"] = "CVVHDF"
         return out

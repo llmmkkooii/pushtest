@@ -38,6 +38,12 @@ def test_classify_modality_crrt_vs_ihd():
     assert classify_modality("HD") == "IHD"
 
 
+def test_classify_modality_handles_eicu_spaced_format():
+    # eICU treatmentstring spaces out letters, e.g. "C V V H D".
+    assert classify_modality("renal|dialysis|C V V H D") == "CRRT"
+    assert classify_modality("renal|dialysis|hemodialysis") == "IHD"
+
+
 def test_ihd_routine_alternate_day_sessions_are_one_attempt():
     # 4h IHD sessions every ~48h: gaps (<72h) are routine, NOT attempts.
     # Only the trailing sustained off is an attempt.

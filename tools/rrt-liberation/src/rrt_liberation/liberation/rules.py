@@ -16,8 +16,13 @@ _CRRT_MARKERS = ("CVVH", "CRRT", "CONTIN")
 
 
 def classify_modality(modality: Optional[str]) -> str:
-    """Classify a modality string into 'CRRT' (continuous) or 'IHD' (intermittent)."""
-    text = (modality or "").upper()
+    """Classify a modality string into 'CRRT' (continuous) or 'IHD' (intermittent).
+
+    Whitespace is stripped before matching so eICU's letter-spaced treatmentstring
+    (e.g. "C V V H D") classifies the same as a canonical label (e.g. "CVVHDF").
+    Anything not matching a continuous marker is treated as intermittent (IHD/SLED).
+    """
+    text = "".join((modality or "").upper().split())
     if any(marker in text for marker in _CRRT_MARKERS):
         return "CRRT"
     return "IHD"

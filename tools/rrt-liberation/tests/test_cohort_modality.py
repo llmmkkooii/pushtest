@@ -48,6 +48,24 @@ def test_mimic_builder_scalar_path_unchanged():
     assert cohort.iloc[0]["success"] == 1
 
 
+def test_eicu_ihd_sessions_derive_modality_and_group():
+    # Raw eICU IHD sessions (4h each), alternate-day (48h gaps). to_canonical_events
+    # should derive modality=IHD from treatmentstring; the 72h IHD threshold then
+    # groups routine gaps into a single trailing-off attempt.
+    ev = pd.DataFrame(
+        [
+            {"patientunitstayid": 9, "treatmentoffset": h * 60,
+             "treatmentstopoffset": (h + 4) * 60,
+             "treatmentstring": "renal|dialysis|hemodialysis"}
+            for h in (0, 48, 96)
+        ]
+    )
+    builder = EicuCohortBuilder(min_off_hours_by_class=_MAP)
+    cohort = builder.build(events=ev, horizon_hours=7 * 24)
+    assert len(cohort) == 1
+    assert (cohort["modality_class"] == "IHD").all()
+
+
 def test_eicu_builder_propagates_per_class_map():
     # eICU modality is still hardcoded CVVHDF (CRRT) until the extraction layer derives
     # it (increment 3). Here we verify the map propagates and the CRRT threshold (24h)
