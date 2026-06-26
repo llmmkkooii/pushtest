@@ -13,6 +13,7 @@ from rrt_liberation.extract import (
     build_mimic_flags,
     build_mimic_labs,
     build_mimic_rrt_events,
+    build_mimic_stays,
 )
 from rrt_liberation.utils import write_csv
 
@@ -29,6 +30,7 @@ def main(cfg: DictConfig) -> None:
     inputevents = pd.read_csv(raw.inputevents)
     ventilation = pd.read_csv(raw.ventilation)
     stays = pd.read_csv(raw.icustays)
+    admissions = pd.read_csv(raw.admissions)
 
     out = Path(cfg.paths.output_dir)
     write_csv(
@@ -52,6 +54,7 @@ def main(cfg: DictConfig) -> None:
         ),
         out / "flags.csv",
     )
+    write_csv(build_mimic_stays(stays, admissions), out / "stays.csv")
     logger.info("Wrote canonical MIMIC CSVs to %s", out)
 
 

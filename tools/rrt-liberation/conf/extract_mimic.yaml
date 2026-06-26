@@ -6,6 +6,7 @@ raw:
   inputevents: ${paths.data_dir}/mimic_raw/inputevents.csv
   ventilation: ${paths.data_dir}/mimic_raw/ventilation.csv
   icustays: ${paths.data_dir}/mimic_raw/icustays.csv
+  admissions: ${paths.data_dir}/mimic_raw/admissions.csv
 itemids:
   # CRRT takes precedence over IHD for any shared itemid. itemid lists are DEFAULTS —
   # confirm against d_items. 要確認.
