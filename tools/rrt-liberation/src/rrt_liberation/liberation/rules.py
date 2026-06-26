@@ -78,6 +78,42 @@ def find_attempts(
     )
 
 
+def label_recovery(
+    stays: pd.DataFrame, events: pd.DataFrame, recovery_window_hours: float = 336.0
+) -> pd.DataFrame:
+    """Per-stay kidney recovery (dialysis independence) outcome.
+
+    recovered = 1 if the patient is alive at discharge AND has been dialysis-free for at
+    least ``recovery_window_hours`` immediately before discharge (default 14 days, per the
+    LIBERATE-D "alive and >= 14 consecutive dialysis-free days" endpoint); else 0.
+
+    Args:
+        stays: one row per ICU stay with ``stay_id``, ``discharge_time`` (datetime), and
+            ``died`` (1 if the patient died in hospital, else 0).
+        events: canonical RRT on-intervals with ``stay_id`` and ``endtime``.
+        recovery_window_hours: required dialysis-free span before discharge.
+
+    Returns:
+        DataFrame with ``stay_id`` and ``recovered`` (0/1), one row per input stay.
+    """
+    last_end = events.groupby("stay_id")["endtime"].max()
+    out = stays[["stay_id"]].copy()
+    window = pd.Timedelta(hours=recovery_window_hours)
+
+    recovered = []
+    for _, s in stays.iterrows():
+        if int(s["died"]) == 1:
+            recovered.append(0)
+            continue
+        end = last_end.get(s["stay_id"])
+        if pd.isna(end):
+            recovered.append(1)  # alive and never on RRT in record
+            continue
+        recovered.append(1 if (s["discharge_time"] - end) >= window else 0)
+    out["recovered"] = recovered
+    return out
+
+
 def label_outcome(
     attempts: pd.DataFrame, events: pd.DataFrame, horizon_hours: float
 ) -> pd.DataFrame:
