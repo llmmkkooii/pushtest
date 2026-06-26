@@ -3,6 +3,7 @@ min_off_hours: 24.0
 events_csv: ${paths.data_dir}/eicu/crrt_events.csv
 labs_csv: ${paths.data_dir}/eicu/labs.csv
 flags_csv: ${paths.data_dir}/eicu/flags.csv
+stays_csv: ${paths.data_dir}/eicu/stays.csv  # per-stay discharge_time + died (recovery)
 
 # Per-modality off-threshold for attempt detection (IHD intermittent vs CRRT continuous).
 # CRRT 24h; IHD 72h (> routine daily/alternate-day scheduling). Sensitivity: 48/72/96h.

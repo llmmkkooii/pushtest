@@ -30,18 +30,20 @@ def stratify_by_modality(
     fit_fn: Callable[[pd.DataFrame, np.ndarray], object],
     n_boot: int = 200,
     seed: int = 42,
+    outcome_col: str = "success",
 ) -> List[Dict[str, object]]:
     """Return one metrics row for "overall" then each modality class in ``feats``.
 
-    ``feats`` must carry ``success`` and ``modality_class`` columns (as produced by the
-    cohort builder + ``build_features``). A stratum that is empty or single-class is
-    reported with NaN metrics and ``single_class=True`` rather than fitting a model.
+    ``feats`` must carry ``modality_class`` and the outcome column ``outcome_col``
+    (``success`` for liberation, ``recovered`` for the recovery cohort). A stratum that
+    is empty or single-class is reported with NaN metrics and ``single_class=True``
+    rather than fitting a model.
     """
     classes = sorted(c for c in feats["modality_class"].dropna().unique())
     rows: List[Dict[str, object]] = []
     for modality in ["overall", *classes]:
         sub = feats if modality == "overall" else feats[feats["modality_class"] == modality]
-        y = sub["success"].to_numpy()
+        y = sub[outcome_col].to_numpy()
         n = int(len(y))
         n_events = int(y.sum()) if n else 0
         if n == 0 or len(np.unique(y)) < 2:
