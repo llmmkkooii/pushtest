@@ -18,7 +18,7 @@ from rrt_liberation.liberation import get_horizon
 from rrt_liberation.model.base import BaseModel
 from rrt_liberation.model.persistence import load_model_json
 from rrt_liberation.model.underscore import UnderscoreModel
-from rrt_liberation.utils import read_csv, set_seed, write_csv
+from rrt_liberation.utils import class_map_from_cfg, read_csv, set_seed, write_csv
 
 logger = logging.getLogger(__name__)
 
@@ -62,12 +62,15 @@ def run_benchmark_comparison(
     n_boot: int = 200,
     seed: int = 42,
     flags_csv: Optional[str | Path] = None,
+    min_off_hours_by_class: Optional[Dict[str, float]] = None,
 ) -> List[Dict[str, object]]:
     """Compare three fixed models on the same external cohort (no retraining)."""
     set_seed(seed)
     output_dir = Path(output_dir)
 
-    builder = CohortFactory(cohort_name)(min_off_hours=min_off_hours)
+    builder = CohortFactory(cohort_name)(
+        min_off_hours=min_off_hours, min_off_hours_by_class=min_off_hours_by_class
+    )
     events = read_csv(events_csv)
     labs = read_csv(labs_csv)
     horizon = get_horizon(liberation_name)
@@ -153,6 +156,7 @@ def main(cfg: DictConfig) -> None:
         n_boot=cfg.n_boot,
         seed=cfg.seed,
         flags_csv=cfg.cohort.get("flags_csv"),
+        min_off_hours_by_class=class_map_from_cfg(cfg.cohort),
     )
 
 
