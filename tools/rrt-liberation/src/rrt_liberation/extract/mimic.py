@@ -42,25 +42,63 @@ def build_mimic_crrt_events(
 
     rows: list[dict] = []
     for stay_id, grp in crrt.sort_values("starttime").groupby("stay_id"):
-        subject_id = grp["subject_id"].iloc[0]
-        cur_start = cur_end = None
-        for _, r in grp.iterrows():
-            s, e = r["starttime"], r["endtime"]
-            if cur_start is None:
-                cur_start, cur_end = s, e
-            elif s <= cur_end + gap:
-                cur_end = max(cur_end, e)
-            else:
-                rows.append(
-                    {"subject_id": subject_id, "stay_id": stay_id,
-                     "starttime": cur_start, "endtime": cur_end, "modality": "CRRT"}
-                )
-                cur_start, cur_end = s, e
-        rows.append(
-            {"subject_id": subject_id, "stay_id": stay_id,
-             "starttime": cur_start, "endtime": cur_end, "modality": "CRRT"}
-        )
+        rows.extend(_merge_stay_intervals(grp, gap, stay_id, "CRRT"))
     logger.debug("Built %d CRRT episodes from %d rows.", len(rows), len(crrt))
+    return pd.DataFrame(rows, columns=_EVENTS_COLS)
+
+
+def _merge_stay_intervals(
+    grp: pd.DataFrame, gap: pd.Timedelta, stay_id: object, modality: str
+) -> list[dict]:
+    """Merge one stay's sorted on-intervals whose gap is <= ``gap`` into episodes."""
+    subject_id = grp["subject_id"].iloc[0]
+    out: list[dict] = []
+    cur_start = cur_end = None
+    for _, r in grp.iterrows():
+        s, e = r["starttime"], r["endtime"]
+        if cur_start is None:
+            cur_start, cur_end = s, e
+        elif s <= cur_end + gap:
+            cur_end = max(cur_end, e)
+        else:
+            out.append({"subject_id": subject_id, "stay_id": stay_id,
+                        "starttime": cur_start, "endtime": cur_end, "modality": modality})
+            cur_start, cur_end = s, e
+    out.append({"subject_id": subject_id, "stay_id": stay_id,
+                "starttime": cur_start, "endtime": cur_end, "modality": modality})
+    return out
+
+
+def build_mimic_rrt_events(
+    procedureevents: pd.DataFrame,
+    crrt_itemids: Sequence[int],
+    ihd_itemids: Sequence[int],
+    merge_gap_hours: float = 6.0,
+) -> pd.DataFrame:
+    """RRT on-intervals per ICU stay, tagged by modality.
+
+    CRRT rows (``crrt_itemids``) are merged within ``merge_gap_hours`` into continuous
+    episodes ("CRRT"). IHD rows (``ihd_itemids``, excluding any itemid also in
+    ``crrt_itemids`` — CRRT takes precedence) are emitted as individual sessions
+    ("IHD") so routine intermittent scheduling survives for the 72h attempt threshold.
+    """
+    crrt_set = set(crrt_itemids)
+    ihd_set = set(ihd_itemids) - crrt_set
+    proc = procedureevents.copy()
+    proc["starttime"] = pd.to_datetime(proc["starttime"])
+    proc["endtime"] = pd.to_datetime(proc["endtime"])
+    gap = pd.Timedelta(hours=merge_gap_hours)
+
+    rows: list[dict] = []
+    crrt = proc[proc["itemid"].isin(crrt_set)]
+    for stay_id, grp in crrt.sort_values("starttime").groupby("stay_id"):
+        rows.extend(_merge_stay_intervals(grp, gap, stay_id, "CRRT"))
+
+    ihd = proc[proc["itemid"].isin(ihd_set)]
+    for _, r in ihd.sort_values("starttime").iterrows():
+        rows.append({"subject_id": r["subject_id"], "stay_id": r["stay_id"],
+                     "starttime": r["starttime"], "endtime": r["endtime"], "modality": "IHD"})
+
     return pd.DataFrame(rows, columns=_EVENTS_COLS)
 
 

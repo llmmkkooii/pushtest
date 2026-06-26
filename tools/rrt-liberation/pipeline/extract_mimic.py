@@ -10,9 +10,9 @@ import pandas as pd
 from omegaconf import DictConfig
 
 from rrt_liberation.extract import (
-    build_mimic_crrt_events,
     build_mimic_flags,
     build_mimic_labs,
+    build_mimic_rrt_events,
 )
 from rrt_liberation.utils import write_csv
 
@@ -32,7 +32,9 @@ def main(cfg: DictConfig) -> None:
 
     out = Path(cfg.paths.output_dir)
     write_csv(
-        build_mimic_crrt_events(procedureevents, list(cfg.itemids.crrt), cfg.merge_gap_hours),
+        build_mimic_rrt_events(
+            procedureevents, list(cfg.itemids.crrt), list(cfg.itemids.ihd), cfg.merge_gap_hours
+        ),
         out / "crrt_events.csv",
     )
     write_csv(
