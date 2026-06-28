@@ -23,13 +23,23 @@ logger = logging.getLogger(__name__)
 @hydra.main(version_base=None, config_path="../conf", config_name="extract_eicu")
 def main(cfg: DictConfig) -> None:
     raw = cfg.raw
-    treatment = pd.read_csv(raw.treatment)
-    lab = pd.read_csv(raw.lab)
-    intakeoutput = pd.read_csv(raw.intakeoutput)
-    diagnosis = pd.read_csv(raw.diagnosis)
-    infusiondrug = pd.read_csv(raw.infusiondrug)
-    respiratorycare = pd.read_csv(raw.respiratorycare)
-    patient = pd.read_csv(raw.patient)
+    # usecols keeps memory bounded: lab (~4 GB) / intakeoutput (~2 GB) uncompressed
+    # collapse to a few columns; .csv.gz is decompressed by pandas transparently.
+    treatment = pd.read_csv(
+        raw.treatment,
+        usecols=["patientunitstayid", "treatmentoffset", "treatmentstopoffset", "treatmentstring"],
+    )
+    lab = pd.read_csv(raw.lab, usecols=["patientunitstayid", "labname", "labresult"])
+    intakeoutput = pd.read_csv(
+        raw.intakeoutput, usecols=["patientunitstayid", "celllabel", "cellvaluenumeric"]
+    )
+    diagnosis = pd.read_csv(raw.diagnosis, usecols=["patientunitstayid", "diagnosisstring"])
+    infusiondrug = pd.read_csv(raw.infusiondrug, usecols=["patientunitstayid", "drugname"])
+    respiratorycare = pd.read_csv(raw.respiratorycare, usecols=["patientunitstayid"])
+    patient = pd.read_csv(
+        raw.patient,
+        usecols=["patientunitstayid", "hospitaldischargeoffset", "hospitaldischargestatus"],
+    )
 
     out = Path(cfg.paths.output_dir)
     write_csv(
