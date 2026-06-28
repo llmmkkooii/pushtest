@@ -28,9 +28,10 @@ def main(cfg: DictConfig) -> None:
     labevents = pd.read_csv(raw.labevents)
     diagnoses_icd = pd.read_csv(raw.diagnoses_icd)
     inputevents = pd.read_csv(raw.inputevents)
-    ventilation = pd.read_csv(raw.ventilation)
     stays = pd.read_csv(raw.icustays)
     admissions = pd.read_csv(raw.admissions)
+    # MIMIC-IV 3.1 removed the ventilation table; derive from procedureevents instead.
+    ventilation = procedureevents[["stay_id", "itemid"]].drop_duplicates()
 
     out = Path(cfg.paths.output_dir)
     write_csv(

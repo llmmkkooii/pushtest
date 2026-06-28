@@ -1,22 +1,25 @@
 raw:
-  treatment: ${paths.data_dir}/eicu_raw/treatment.csv
-  lab: ${paths.data_dir}/eicu_raw/lab.csv
-  intakeoutput: ${paths.data_dir}/eicu_raw/intakeOutput.csv
-  diagnosis: ${paths.data_dir}/eicu_raw/diagnosis.csv
-  infusiondrug: ${paths.data_dir}/eicu_raw/infusionDrug.csv
-  respiratorycare: ${paths.data_dir}/eicu_raw/respiratoryCare.csv
-  patient: ${paths.data_dir}/eicu_raw/patient.csv
+  # eICU 2.0: all files are .csv.gz; pandas read_csv decompresses automatically.
+  treatment: /Volumes/Extreme_SSD/eicu-collaborative-research-database-2.0/treatment.csv.gz
+  lab: /Volumes/Extreme_SSD/eicu-collaborative-research-database-2.0/lab.csv.gz
+  intakeoutput: /Volumes/Extreme_SSD/eicu-collaborative-research-database-2.0/intakeOutput.csv.gz
+  diagnosis: /Volumes/Extreme_SSD/eicu-collaborative-research-database-2.0/diagnosis.csv.gz
+  infusiondrug: /Volumes/Extreme_SSD/eicu-collaborative-research-database-2.0/infusionDrug.csv.gz
+  respiratorycare: /Volumes/Extreme_SSD/eicu-collaborative-research-database-2.0/respiratoryCharting.csv.gz
+  patient: /Volumes/Extreme_SSD/eicu-collaborative-research-database-2.0/patient.csv.gz
+
 terms:
-  # CRRT takes precedence over IHD for ambiguous strings (e.g. "continuous venovenous
-  # hemodialysis"). Term lists are DEFAULTS — confirm against the real eICU vocabulary.
+  # CRRT takes precedence over IHD for ambiguous strings.
   crrt: ["cvvh", "cvvhd", "cvvhdf", "crrt", "continuous renal replacement", "scuf"]
-  ihd: ["hemodialysis", "ihd", "sled", "sustained low efficiency"]  # 要確認
+  ihd: ["hemodialysis", "ihd", "sled", "sustained low efficiency"]
   creatinine: ["creatinine"]
   urine: ["urine", "foley", "void"]
   septic_shock: ["septic shock"]
   vasopressor: ["norepinephrine", "epinephrine", "vasopressin", "dopamine", "phenylephrine"]
   ventilation: ["ventilator", "mechanical vent", "intubat"]
+
 merge_gap_minutes: 360.0
+
 paths:
   data_dir: data
   output_dir: ${paths.data_dir}/eicu
