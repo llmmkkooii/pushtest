@@ -21,7 +21,9 @@ def _contains_any(series: pd.Series, terms: Sequence[str]) -> pd.Series:
     eICU treatmentstrings are sometimes letter-spaced (e.g. "C V V H D"); stripping
     whitespace on both sides lets compact configured terms ("cvvh") still match.
     """
-    low = series.astype(str).str.lower().str.replace(r"\s+", "", regex=True)
+    # fillna("") first: pandas .astype(str) leaves NaN as float nan (not "nan"), which
+    # breaks the `n in s` substring test on real data with missing strings.
+    low = series.fillna("").astype(str).str.lower().str.replace(r"\s+", "", regex=True)
     needles = ["".join(t.lower().split()) for t in terms]
     return low.apply(lambda s: any(n in s for n in needles))
 
