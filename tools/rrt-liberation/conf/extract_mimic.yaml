@@ -1,24 +1,27 @@
 raw:
-  procedureevents: ${paths.data_dir}/mimic_raw/procedureevents.csv
-  outputevents: ${paths.data_dir}/mimic_raw/outputevents.csv
-  labevents: ${paths.data_dir}/mimic_raw/labevents.csv
-  diagnoses_icd: ${paths.data_dir}/mimic_raw/diagnoses_icd.csv
-  inputevents: ${paths.data_dir}/mimic_raw/inputevents.csv
-  ventilation: ${paths.data_dir}/mimic_raw/ventilation.csv
-  icustays: ${paths.data_dir}/mimic_raw/icustays.csv
-  admissions: ${paths.data_dir}/mimic_raw/admissions.csv
+  procedureevents: /Volumes/Extreme_SSD/mimic-iv-3.1/mimic_data_dir/icu/procedureevents.csv
+  outputevents: /Volumes/Extreme_SSD/mimic-iv-3.1/mimic_data_dir/icu/outputevents.csv
+  labevents: /Volumes/Extreme_SSD/mimic-iv-3.1/mimic_data_dir/hosp/labevents.csv
+  diagnoses_icd: /Volumes/Extreme_SSD/mimic-iv-3.1/mimic_data_dir/hosp/diagnoses_icd.csv
+  inputevents: /Volumes/Extreme_SSD/mimic-iv-3.1/mimic_data_dir/icu/inputevents.csv
+  icustays: /Volumes/Extreme_SSD/mimic-iv-3.1/mimic_data_dir/icu/icustays.csv
+  admissions: /Volumes/Extreme_SSD/mimic-iv-3.1/mimic_data_dir/hosp/admissions.csv
+  # ventilation table removed in MIMIC-IV 3.1 — derived from procedureevents in extract_mimic.py
+
 itemids:
-  # CRRT takes precedence over IHD for any shared itemid. itemid lists are DEFAULTS —
-  # confirm against d_items. 要確認.
+  # CRRT takes precedence over IHD for any shared itemid.
   crrt: [225802, 225803, 225805, 225809]
-  ihd: [225441]  # 要確認: 225441 = Hemodialysis (intermittent)
+  ihd: [225441]  # 225441 = Hemodialysis (intermittent) — confirm against d_items
   urine: [226559, 226560, 227510]
   creatinine: [50912]
   vasopressor: [221906, 221289, 222315, 221662, 221749]
-  ventilation: [225792, 225794]
+  ventilation: [225792, 225794]  # 225792=Invasive Vent, 225794=Non-Invasive Vent
+
 codes:
   septic_shock_icd: ["R6521", "78552"]
+
 merge_gap_hours: 6.0
+
 paths:
   data_dir: data
   output_dir: ${paths.data_dir}/mimic
