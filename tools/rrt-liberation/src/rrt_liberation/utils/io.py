@@ -2,6 +2,7 @@ import json
 import logging
 import math
 from pathlib import Path
+from typing import Sequence
 
 import pandas as pd
 
@@ -15,6 +16,39 @@ def read_csv(path: str | Path) -> pd.DataFrame:
         logger.error("CSV not found: %s", path)
         raise FileNotFoundError(path)
     return pd.read_csv(path)
+
+
+def read_csv_filtered(
+    path: str | Path,
+    usecols: Sequence[str],
+    filter_col: str,
+    keep_values: Sequence[object],
+    chunksize: int = 1_000_000,
+) -> pd.DataFrame:
+    """Read a (possibly huge) local CSV in chunks, keeping only ``usecols`` and rows whose
+    ``filter_col`` is in ``keep_values``.
+
+    Used for MIMIC tables that do not fit in memory (e.g. labevents ~17 GB): only a few
+    itemids and columns are ever needed, so filtering per chunk keeps memory bounded.
+    Local I/O only. ``.csv.gz`` is decompressed transparently by pandas.
+    """
+    path = Path(path)
+    if not path.exists():
+        logger.error("CSV not found: %s", path)
+        raise FileNotFoundError(path)
+    keep = set(keep_values)
+    cols = list(usecols)
+    parts: list[pd.DataFrame] = []
+    n_read = 0
+    for chunk in pd.read_csv(path, usecols=cols, chunksize=chunksize):
+        n_read += len(chunk)
+        parts.append(chunk[chunk[filter_col].isin(keep)])
+    out = pd.concat(parts, ignore_index=True) if parts else pd.DataFrame(columns=cols)
+    logger.info(
+        "read_csv_filtered %s: scanned %d rows, kept %d on %s in %d values",
+        path.name, n_read, len(out), filter_col, len(keep),
+    )
+    return out[cols]
 
 
 def write_csv(df: pd.DataFrame, path: str | Path) -> None:
