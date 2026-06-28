@@ -27,8 +27,13 @@ def main(cfg: DictConfig) -> None:
     # collapse to a few columns; .csv.gz is decompressed by pandas transparently.
     treatment = pd.read_csv(
         raw.treatment,
-        usecols=["patientunitstayid", "treatmentoffset", "treatmentstopoffset", "treatmentstring"],
+        usecols=["patientunitstayid", "treatmentoffset", "treatmentstring"],
     )
+    # eICU `treatment` is point-documented (no stop offset): each RRT mention is a
+    # zero-duration marker at treatmentoffset. merge_gap_minutes coalesces markers of the
+    # same episode; the IHD/CRRT off-thresholds then detect liberation. eICU carries no
+    # true RRT duration — a documented limitation vs MIMIC procedureevents intervals.
+    treatment["treatmentstopoffset"] = treatment["treatmentoffset"]
     lab = pd.read_csv(raw.lab, usecols=["patientunitstayid", "labname", "labresult"])
     intakeoutput = pd.read_csv(
         raw.intakeoutput, usecols=["patientunitstayid", "celllabel", "cellvaluenumeric"]
